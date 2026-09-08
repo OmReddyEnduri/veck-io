@@ -495,7 +495,7 @@
   let player = { pos: new THREE.Vector3(0, 2.4, 40), vel: new THREE.Vector3(), hp: 100, shield: 100, onGround: false, speed: 22, sprintMult: 1.5, lastDamageTime: 0 };
   let camTrauma = 0, camRoll = 0;
 
-  let gunGroup, gunBody, muzzleFlashMesh, muzzleLight, gunRecoil = 0;
+  let gunGroup, gunModels, gunBody, muzzleFlashMesh, muzzleLight, gunRecoil = 0;
   let shellCasings = [], bulletTracers = [], powerupCrates = [];
   let rivalBot = null, enemyLasers = [], particles = [], jumpPads = [];
   let collisionBoxes = [], obstacleMeshes = [], mapObjectsGroup = null;
@@ -699,21 +699,54 @@
   // ─── FPS GUN MODEL ───
   function buildFPSGunModel() {
     gunGroup = new THREE.Group();
+    gunModels = {};
     const matDark = new THREE.MeshStandardMaterial({ color: 0x222842, metalness: 0.9, roughness: 0.2 });
     const matSkin = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 0.9, metalness: 0.8, roughness: 0.2 });
 
-    gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.55), matDark); gunGroup.add(gunBody);
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.58), matSkin); rail.position.set(0, 0.09, 0); gunGroup.add(rail);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.45, 12), matDark); barrel.rotation.x = Math.PI/2; barrel.position.set(0, 0.04, -0.4); gunGroup.add(barrel);
-    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, 0.14), matSkin); mag.position.set(0, -0.16, 0.05); mag.rotation.x = 0.2; gunGroup.add(mag);
-    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.1), matDark); sight.position.set(0, 0.14, 0.1); gunGroup.add(sight);
+    // RIFLE — full-auto carbine w/ top rail + reflex sight
+    const rifle = new THREE.Group();
+    gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.55), matDark); rifle.add(gunBody);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.58), matSkin); rail.position.set(0, 0.09, 0); rifle.add(rail);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.45, 12), matDark); barrel.rotation.x = Math.PI/2; barrel.position.set(0, 0.04, -0.4); rifle.add(barrel);
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.28, 0.14), matSkin); mag.position.set(0, -0.16, 0.05); mag.rotation.x = 0.2; rifle.add(mag);
+    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.1), matDark); sight.position.set(0, 0.14, 0.1); rifle.add(sight);
     const sightRing = new THREE.Mesh(new THREE.RingGeometry(0.015, 0.025, 16), new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide }));
-    sightRing.position.set(0, 0.16, 0.05); gunGroup.add(sightRing);
+    sightRing.position.set(0, 0.16, 0.05); rifle.add(sightRing);
+    gunGroup.add(rifle); gunModels.rifle = rifle;
+
+    // SHOTGUN — stubby twin-barrel pump
+    const shotgun = new THREE.Group();
+    shotgun.add(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.2, 0.4), matDark));
+    const sgBarrelL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 12), matDark); sgBarrelL.rotation.x = Math.PI/2; sgBarrelL.position.set(-0.045, 0.05, -0.35); shotgun.add(sgBarrelL);
+    const sgBarrelR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 12), matDark); sgBarrelR.rotation.x = Math.PI/2; sgBarrelR.position.set(0.045, 0.05, -0.35); shotgun.add(sgBarrelR);
+    const pump = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.22), matSkin); pump.position.set(0, -0.05, -0.15); shotgun.add(pump);
+    const sgStock = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.22), matDark); sgStock.position.set(0, -0.02, 0.28); shotgun.add(sgStock);
+    shotgun.visible = false; gunGroup.add(shotgun); gunModels.shotgun = shotgun;
+
+    // SNIPER — long barrel + scope tube
+    const sniper = new THREE.Group();
+    sniper.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.13, 0.6), matDark));
+    const snBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.75, 12), matDark); snBarrel.rotation.x = Math.PI/2; snBarrel.position.set(0, 0.03, -0.65); sniper.add(snBarrel);
+    const scopeTube = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.4, 16), matSkin); scopeTube.rotation.x = Math.PI/2; scopeTube.position.set(0, 0.14, -0.05); sniper.add(scopeTube);
+    const scopeLens = new THREE.Mesh(new THREE.RingGeometry(0.03, 0.045, 16), new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide })); scopeLens.position.set(0, 0.14, -0.25); sniper.add(scopeLens);
+    const snMag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.1), matSkin); snMag.position.set(0, -0.13, 0.12); snMag.rotation.x = 0.15; sniper.add(snMag);
+    sniper.visible = false; gunGroup.add(sniper); gunModels.sniper = sniper;
+
+    // RAILGUN — blocky chassis w/ glowing coil rings + power cell
+    const railgun = new THREE.Group();
+    railgun.add(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.19, 0.35), matDark));
+    const rgBarrel = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.55), matDark); rgBarrel.position.set(0, 0.02, -0.45); railgun.add(rgBarrel);
+    const coilMat = new THREE.MeshBasicMaterial({ color: 0x9400ff });
+    [-0.25, -0.4, -0.55].forEach(z => {
+      const coil = new THREE.Mesh(new THREE.TorusGeometry(0.065, 0.012, 8, 16), coilMat); coil.position.set(0, 0.02, z); coil.rotation.y = Math.PI/2; railgun.add(coil);
+    });
+    const cell = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.24, 0.16), matSkin); cell.position.set(0, -0.16, 0.08); railgun.add(cell);
+    railgun.visible = false; gunGroup.add(railgun); gunModels.railgun = railgun;
 
     const flashMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0 });
     muzzleFlashMesh = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.45, 8), flashMat);
-    muzzleFlashMesh.rotation.x = -Math.PI/2; muzzleFlashMesh.position.set(0, 0.04, -0.7); gunGroup.add(muzzleFlashMesh);
-    muzzleLight = new THREE.PointLight(0x00f0ff, 0, 16); muzzleLight.position.set(0, 0.04, -0.7); gunGroup.add(muzzleLight);
+    muzzleFlashMesh.rotation.x = -Math.PI/2; muzzleFlashMesh.position.set(0, 0.04, -0.75); gunGroup.add(muzzleFlashMesh);
+    muzzleLight = new THREE.PointLight(0x00f0ff, 0, 16); muzzleLight.position.set(0, 0.04, -0.75); gunGroup.add(muzzleLight);
 
     gunGroup.position.set(0.28, -0.26, -0.52);
     camera.add(gunGroup);
@@ -778,6 +811,7 @@
     document.getElementById('weaponNameDisplay').innerHTML = `${wp.name} <span class="skin-tag" id="skinDisplayTag">[${activeSkin}]</span>`;
     document.getElementById('ammoCurr').textContent = wp.ammo;
     document.getElementById('ammoMax').textContent = wp.reserve;
+    if (gunModels) Object.keys(gunModels).forEach(k => gunModels[k].visible = (k === wp.type));
   }
   function reloadWeapon() {
     const wp = weapons[currentWeaponIdx];
@@ -1158,7 +1192,9 @@
       // Dynamic Camera Roll (strafe tilt + dash)
       const targetRoll = keys['KeyA'] ? 0.04 : (keys['KeyD'] ? -0.04 : 0);
       camRoll = THREE.MathUtils.lerp(camRoll, targetRoll, 0.08);
-      camera.rotation.z = camRoll;
+      euler.setFromQuaternion(camera.quaternion);
+      euler.z = camRoll;
+      camera.quaternion.setFromEuler(euler);
 
       camera.position.set(player.pos.x + shakeX, player.pos.y + shakeY, player.pos.z);
 
