@@ -483,7 +483,7 @@
   <!-- ════════ FULL MULTIPLAYER 3D GAME ENGINE ════════ -->
   <script>
   const ARENA_SIZE = 260;
-  const PLAYER_RADIUS = 0.8;
+  const PLAYER_RADIUS = 0.5;
 
   const skinThemes = {
     CYBER:  { color: 0x00f0ff, emissive: 0x00f0ff, hex: '#00f0ff' },
@@ -522,6 +522,43 @@
   };
   let selectedMapKey = 'NEON_ARENA';
 
+  const SPAWN_POSITIONS = {
+    NEON_ARENA: [
+      new THREE.Vector3(0, 2.4, 60),
+      new THREE.Vector3(0, 2.4, -60),
+      new THREE.Vector3(60, 2.4, 0),
+      new THREE.Vector3(-60, 2.4, 0),
+      new THREE.Vector3(35, 2.4, 35),
+      new THREE.Vector3(-35, 2.4, -35),
+      new THREE.Vector3(35, 2.4, -35),
+      new THREE.Vector3(-35, 2.4, 35)
+    ],
+    ORBITAL: [
+      new THREE.Vector3(0, 2.4, 60),
+      new THREE.Vector3(0, 2.4, -60),
+      new THREE.Vector3(60, 2.4, 0),
+      new THREE.Vector3(-60, 2.4, 0),
+      new THREE.Vector3(45, 2.4, 45),
+      new THREE.Vector3(-45, 2.4, -45)
+    ],
+    MAGMA: [
+      new THREE.Vector3(30, 2.4, 30),
+      new THREE.Vector3(-30, 2.4, -30),
+      new THREE.Vector3(30, 2.4, -30),
+      new THREE.Vector3(-30, 2.4, 30),
+      new THREE.Vector3(0, 2.4, 65),
+      new THREE.Vector3(0, 2.4, -65)
+    ],
+    CYBER_GRID: [
+      new THREE.Vector3(0, 2.4, 65),
+      new THREE.Vector3(0, 2.4, -65),
+      new THREE.Vector3(65, 2.4, 0),
+      new THREE.Vector3(-65, 2.4, 0),
+      new THREE.Vector3(45, 2.4, 45),
+      new THREE.Vector3(-45, 2.4, -45)
+    ]
+  };
+
   const weapons = [
     { name: "PULSE RIFLE // PR-44",    type: "rifle",   fireRate: 100,  ammo: 30, maxAmmo: 30, reserve: 120, dmg: 26,  spread: 0.015, zoomFov: 50, auto: true  },
     { name: "CYBER SHOTGUN // SG-9",   type: "shotgun", fireRate: 600,  ammo: 8,  maxAmmo: 8,  reserve: 40,  dmg: 20,  pellets: 8, spread: 0.08, zoomFov: 60, auto: false },
@@ -536,7 +573,7 @@
   let isSliding = false, slideTimer = 0, slideDir = new THREE.Vector3();
   let dashEnergy = 100, dashCooldownTimer = 0;
   let scene, camera, renderer, isLocked = false;
-  let player = { pos: new THREE.Vector3(0, 2.4, 40), vel: new THREE.Vector3(), hp: 100, shield: 100, onGround: false, speed: 22, sprintMult: 1.5, lastDamageTime: 0 };
+  let player = { pos: new THREE.Vector3(0, 2.4, 60), vel: new THREE.Vector3(), hp: 100, shield: 100, onGround: false, speed: 22, sprintMult: 1.5, lastDamageTime: 0 };
   let camTrauma = 0, camRoll = 0;
 
   // Viewmodel & Rendering
@@ -553,8 +590,16 @@
   let activeRoomCode = 'THARKA-PRIME';
   let mqttClient = null;
   let broadcastChannel = null;
-  const remotePlayers = new Map(); // id -> { id, name, skin, mesh, headMesh, nametagSprite, nametagCanvas, hp, shield, ... }
+  const remotePlayers = new Map();
   let lastNetworkBroadcast = 0;
+
+  function spawnLocalPlayer() {
+    const list = SPAWN_POSITIONS[selectedMapKey] || SPAWN_POSITIONS.NEON_ARENA;
+    const pt = list[Math.floor(Math.random() * list.length)];
+    player.pos.copy(pt);
+    player.vel.set(0, 0, 0);
+    player.onGround = true;
+  }
 
   // ─── NAMETAG BILLBOARD GENERATOR ───
   function createNametagSprite(playerName, skinKey) {
@@ -566,15 +611,15 @@
     texture.minFilter = THREE.LinearFilter;
     const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(4.8, 1.6, 1);
-    sprite.position.set(0, 4.4, 0);
+    sprite.scale.set(5.2, 1.7, 1);
+    sprite.position.set(0, 4.5, 0);
 
     function update(name, hp, shield, skin) {
       ctx.clearRect(0, 0, 384, 128);
       const themeColor = (skinThemes[skin] || skinThemes.CYBER).hex;
 
       // Card Background
-      ctx.fillStyle = 'rgba(8, 12, 30, 0.88)';
+      ctx.fillStyle = 'rgba(8, 12, 30, 0.9)';
       ctx.strokeStyle = themeColor;
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -582,19 +627,19 @@
       ctx.fill();
       ctx.stroke();
 
-      // Top Header: Name & Skin
+      // Top Header: Name
       ctx.font = 'bold 30px "Orbitron", sans-serif';
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.shadowColor = themeColor;
       ctx.shadowBlur = 15;
-      ctx.fillText(name.toUpperCase(), 192, 50);
+      ctx.fillText(name.toUpperCase(), 192, 48);
       ctx.shadowBlur = 0;
 
       // Health bar track
       ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.beginPath();
-      ctx.roundRect(30, 68, 324, 18, 9);
+      ctx.roundRect(30, 64, 324, 20, 10);
       ctx.fill();
 
       // Health fill
@@ -604,7 +649,7 @@
         ctx.shadowColor = ctx.fillStyle;
         ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.roundRect(30, 68, 324 * hpPct, 18, 9);
+        ctx.roundRect(30, 64, 324 * hpPct, 20, 10);
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -613,7 +658,7 @@
       if (shield > 0) {
         ctx.fillStyle = '#00f0ff';
         ctx.beginPath();
-        ctx.roundRect(30, 92, 324 * (shield / 100), 6, 3);
+        ctx.roundRect(30, 90, 324 * (shield / 100), 6, 3);
         ctx.fill();
       }
 
@@ -629,7 +674,7 @@
     const group = new THREE.Group();
     const theme = skinThemes[skinKey] || skinThemes.CYBER;
     const armorMat = new THREE.MeshStandardMaterial({ color: 0x242c4a, metalness: 0.85, roughness: 0.3 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: theme.color, emissive: theme.emissive, emissiveIntensity: 0.8, metalness: 0.9, roughness: 0.2 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: theme.color, emissive: theme.emissive, emissiveIntensity: 1.0, metalness: 0.9, roughness: 0.2 });
     const visorMat = new THREE.MeshBasicMaterial({ color: 0xffe600 });
     const gunMat = new THREE.MeshStandardMaterial({ color: 0x111422, metalness: 0.9, roughness: 0.2 });
 
@@ -639,8 +684,12 @@
     const core = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.12, 16), skinMat);
     core.rotation.x = Math.PI/2; core.position.set(0, 2.1, 0.42); group.add(core);
 
+    // Responsive Player Hitbox
+    const hitbox = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 3.2, 8), new THREE.MeshBasicMaterial({ visible: false }));
+    hitbox.position.y = 1.6; group.add(hitbox);
+
     // Head (Headshot target)
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.75, 0.7), armorMat);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.8, 0.75), armorMat);
     head.position.set(0, 3.1, 0); head.castShadow = true; head.isHeadshotTarget = true; group.add(head);
     const visor = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.18), visorMat);
     visor.position.set(0, 3.1, 0.36); group.add(visor);
@@ -691,7 +740,7 @@
     try {
       broadcastChannel = new BroadcastChannel(`veck_room_${activeRoomCode}`);
       broadcastChannel.onmessage = (e) => handleNetworkMessage(e.data);
-    } catch(err) { console.log("BroadcastChannel unavailable", err); }
+    } catch(err) { console.log("BroadcastChannel notice:", err); }
 
     // 2. High-speed MQTT over WebSockets
     const brokerUrl = 'wss://broker.emqx.io:8084/mqtt';
@@ -706,7 +755,17 @@
       mqttClient.on('connect', () => {
         console.log(`⚡ Connected to VECK Arena Grid [${activeRoomCode}]`);
         mqttClient.subscribe(topic);
-        broadcastNetworkEvent({ type: 'join', id: localPlayerId, name: localPlayerName, skin: skinKey });
+        // Announce presence immediately
+        broadcastNetworkEvent({
+          type: 'join',
+          id: localPlayerId,
+          name: localPlayerName,
+          skin: skinKey,
+          pos: { x: player.pos.x, y: player.pos.y, z: player.pos.z },
+          rotY: euler.y,
+          hp: player.hp,
+          shield: player.shield
+        });
         addKillfeedSystemMessage(`⚡ CONNECTED TO ARENA: ${activeRoomCode}`);
       });
 
@@ -717,7 +776,7 @@
         } catch(err){}
       });
 
-      mqttClient.on('error', (err) => console.log('MQTT grid notice:', err.message));
+      mqttClient.on('error', (err) => console.log('MQTT notice:', err.message));
     } catch(err) {
       console.log('Online MQTT grid fallback to local channel');
     }
@@ -725,11 +784,9 @@
 
   function broadcastNetworkEvent(data) {
     const payload = { ...data, id: localPlayerId, room: activeRoomCode };
-    // Broadcast locally to tabs
     if (broadcastChannel) {
       try { broadcastChannel.postMessage(payload); } catch(e){}
     }
-    // Broadcast over MQTT
     if (mqttClient && mqttClient.connected) {
       try { mqttClient.publish(`veck/arena/${activeRoomCode.toLowerCase()}`, JSON.stringify(payload)); } catch(e){}
     }
@@ -738,16 +795,18 @@
   function handleNetworkMessage(msg) {
     if (!msg || msg.id === localPlayerId) return;
 
-    if (msg.type === 'pos') {
+    if (msg.type === 'pos' || msg.type === 'join') {
       let p = remotePlayers.get(msg.id);
       if (!p) {
         const mesh = createRemotePlayerMesh(msg.name, msg.skin);
+        const initPos = msg.pos ? new THREE.Vector3(msg.pos.x, msg.pos.y, msg.pos.z) : new THREE.Vector3(0, 2.4, 0);
+        mesh.position.copy(initPos);
         scene.add(mesh);
         p = {
           id: msg.id, name: msg.name, skin: msg.skin,
           mesh, headMesh: mesh.headMesh, nametag: mesh.nametag,
-          hp: msg.hp, shield: msg.shield,
-          targetPos: new THREE.Vector3(msg.pos.x, msg.pos.y, msg.pos.z),
+          hp: msg.hp || 100, shield: msg.shield || 100,
+          targetPos: initPos.clone(),
           targetRotY: msg.rotY || 0,
           animTime: 0, isMoving: false, isSliding: false,
           kills: msg.kills || 0, deaths: msg.deaths || 0, dmg: msg.dmg || 0,
@@ -756,25 +815,42 @@
         remotePlayers.set(msg.id, p);
         addKillfeedSystemMessage(`⚔️ ${msg.name.toUpperCase()} ENTERED THE ARENA`);
         updateRosterTable();
+        updateOnlineCountBadge();
+
+        // If this was a join message, immediately reply with our current state so they see us too
+        if (msg.type === 'join') {
+          broadcastNetworkEvent({
+            type: 'pos',
+            name: localPlayerName,
+            skin: activeSkin,
+            weaponIdx: currentWeaponIdx,
+            pos: { x: player.pos.x, y: player.pos.y, z: player.pos.z },
+            rotY: euler.y,
+            hp: player.hp,
+            shield: player.shield,
+            isMoving: false,
+            isSliding: false,
+            kills, deaths, dmg: totalDmg
+          });
+        }
       }
 
-      p.name = msg.name;
-      p.skin = msg.skin;
-      p.targetPos.set(msg.pos.x, msg.pos.y, msg.pos.z);
-      p.targetRotY = msg.rotY || 0;
-      p.hp = msg.hp;
-      p.shield = msg.shield;
-      p.isMoving = msg.isMoving;
-      p.isSliding = msg.isSliding;
+      if (msg.pos) {
+        p.targetPos.set(msg.pos.x, msg.pos.y, msg.pos.z);
+        if (p.mesh.position.distanceTo(p.targetPos) > 10) p.mesh.position.copy(p.targetPos);
+      }
+      if (msg.rotY !== undefined) p.targetRotY = msg.rotY;
+      if (msg.hp !== undefined) p.hp = msg.hp;
+      if (msg.shield !== undefined) p.shield = msg.shield;
+      if (msg.isMoving !== undefined) p.isMoving = msg.isMoving;
+      if (msg.isSliding !== undefined) p.isSliding = msg.isSliding;
       p.kills = msg.kills || p.kills;
       p.deaths = msg.deaths || p.deaths;
       p.dmg = msg.dmg || p.dmg;
       p.lastSeen = performance.now();
       p.nametag.updateCanvas(p.name, p.hp, p.shield, p.skin);
-      updateOnlineCountBadge();
     }
     else if (msg.type === 'shoot') {
-      // Remote player fired weapon
       const origin = new THREE.Vector3(msg.origin.x, msg.origin.y, msg.origin.z);
       const target = new THREE.Vector3(msg.target.x, msg.target.y, msg.target.z);
       spawnTracer(origin, target, msg.color || 0x00f0ff);
@@ -783,7 +859,6 @@
     }
     else if (msg.type === 'hit') {
       if (msg.targetId === localPlayerId) {
-        // We got shot by another player!
         damagePlayer(msg.dmg, new THREE.Vector3(msg.attPos.x, msg.attPos.y, msg.attPos.z), msg.attackerName, msg.wpType, msg.isCrit);
       }
     }
@@ -794,10 +869,6 @@
         triggerAnnouncer("⚔️ OPERATIVE ELIMINATED!");
       }
       updateRosterTable();
-    }
-    else if (msg.type === 'join') {
-      addKillfeedSystemMessage(`⚔️ ${msg.name.toUpperCase()} CONNECTED`);
-      updateOnlineCountBadge();
     }
   }
 
@@ -859,7 +930,7 @@
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x161c36);
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 2.4, 40);
+    camera.position.set(0, 2.4, 60);
     scene.add(camera);
 
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -877,6 +948,7 @@
     buildFPSGunModel();
     loadSectorMap(selectedMapKey);
     spawnPowerupCrates();
+    spawnLocalPlayer();
 
     // Customizer bindings
     document.querySelectorAll('#skinPicker .opt-btn').forEach(btn => {
@@ -892,6 +964,7 @@
         document.querySelectorAll('#mapPicker .opt-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active'); selectedMapKey = btn.dataset.map;
         loadSectorMap(selectedMapKey);
+        spawnLocalPlayer();
       });
     });
 
@@ -907,6 +980,13 @@
     document.addEventListener('mouseup', onMouseUp);
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('mousemove', onMouseMove);
+
+    // Canvas click to re-acquire pointer lock
+    container.addEventListener('click', () => {
+      if (isLocked && document.pointerLockElement !== document.body) {
+        try { document.body.requestPointerLock(); } catch(e){}
+      }
+    });
 
     // ─── AUTHENTICATION & LOGIN GATE CHECK ───
     document.getElementById('playBtn').addEventListener('click', () => {
@@ -936,7 +1016,7 @@
       document.getElementById('menu-overlay').style.display = 'none';
       document.getElementById('hud').style.display = 'block';
 
-      // Connect to Multiplayer Room Grid!
+      spawnLocalPlayer();
       initMultiplayerNetworking(room, name, activeSkin);
       triggerAnnouncer(`WELCOME, ${name.toUpperCase()}!`);
     });
@@ -1003,7 +1083,7 @@
     // LAYOUT 1: NEON METROPOLIS — Cyberpunk Multi-Lane Urban Battleground
     // ─────────────────────────────────────────────────────────────
     if (mapKey === 'NEON_ARENA') {
-      // 4 Massive Corporate Skyscraper Towers
+      // 4 Massive Corporate Skyscraper Towers at outer perimeter
       [{x:95,z:95},{x:-95,z:95},{x:95,z:-95},{x:-95,z:-95}].forEach(tp => {
         const t = new THREE.Mesh(new THREE.BoxGeometry(22, 38, 22), wallMat);
         t.position.set(tp.x, 19, tp.z); t.castShadow = true; t.receiveShadow = true;
@@ -1013,26 +1093,10 @@
         neonCrown.position.set(tp.x, 37.5, tp.z); mapObjectsGroup.add(neonCrown);
       });
 
-      // 2 Elevated Highway Overpasses (Bridges) at height y=7.5
-      const bridge1 = new THREE.Mesh(new THREE.BoxGeometry(110, 1.5, 16), coverMat);
-      bridge1.position.set(0, 7.5, 0); bridge1.castShadow = true; mapObjectsGroup.add(bridge1); obstacleMeshes.push(bridge1);
-      registerSolidBox(-55, 55, -8, 8, 7, 8.5);
-
-      const bridge2 = new THREE.Mesh(new THREE.BoxGeometry(16, 1.5, 110), coverMat);
-      bridge2.position.set(0, 7.5, 0); bridge2.castShadow = true; mapObjectsGroup.add(bridge2); obstacleMeshes.push(bridge2);
-      registerSolidBox(-8, 8, -55, 55, 7, 8.5);
-
-      // Support pillars for bridges
-      [{x:40,z:0},{x:-40,z:0},{x:0,z:40},{x:0,z:-40}].forEach(p => {
-        const col = new THREE.Mesh(new THREE.BoxGeometry(5, 7.5, 5), wallMat);
-        col.position.set(p.x, 3.75, p.z); mapObjectsGroup.add(col); obstacleMeshes.push(col);
-        registerSolidBox(p.x-2.5, p.x+2.5, p.z-2.5, p.z+2.5, 0, 7.5);
-      });
-
-      // Street Bunkers & Vehicle Barricades
+      // 4 Corner Street Bunkers
       [
-        {x:45,z:45,w:18,h:6,d:6},{x:-45,z:45,w:18,h:6,d:6},{x:45,z:-45,w:18,h:6,d:6},{x:-45,z:-45,w:18,h:6,d:6},
-        {x:70,z:0,w:20,h:5,d:4},{x:-70,z:0,w:20,h:5,d:4},{x:0,z:70,w:4,h:5,d:20},{x:0,z:-70,w:4,h:5,d:20}
+        {x:55,z:55,w:18,h:6,d:6},{x:-55,z:55,w:18,h:6,d:6},{x:55,z:-55,w:18,h:6,d:6},{x:-55,z:-55,w:18,h:6,d:6},
+        {x:80,z:0,w:16,h:5,d:4},{x:-80,z:0,w:16,h:5,d:4},{x:0,z:80,w:4,h:5,d:16},{x:0,z:-80,w:4,h:5,d:16}
       ].forEach(bp => {
         const b = new THREE.Mesh(new THREE.BoxGeometry(bp.w,bp.h,bp.d), coverMat);
         b.position.set(bp.x, bp.h/2, bp.z); b.castShadow = true; b.receiveShadow = true;
@@ -1041,8 +1105,8 @@
       });
 
       // 8 Urban Launch Pads
-      [new THREE.Vector3(50,.2,50),new THREE.Vector3(-50,.2,-50),new THREE.Vector3(50,.2,-50),new THREE.Vector3(-50,.2,50),
-       new THREE.Vector3(0,.2,58),new THREE.Vector3(0,.2,-58),new THREE.Vector3(58,.2,0),new THREE.Vector3(-58,.2,0)
+      [new THREE.Vector3(45,.2,45),new THREE.Vector3(-45,.2,-45),new THREE.Vector3(45,.2,-45),new THREE.Vector3(-45,.2,45),
+       new THREE.Vector3(0,.2,45),new THREE.Vector3(0,.2,-45),new THREE.Vector3(45,.2,0),new THREE.Vector3(-45,.2,0)
       ].forEach(pos => createJumpPadMesh(pos, cfg.gridColor));
     }
 
@@ -1051,33 +1115,24 @@
     // ─────────────────────────────────────────────────────────────
     else if (mapKey === 'ORBITAL') {
       // Central Hexagonal Airlock Hub
-      const centerHub = new THREE.Mesh(new THREE.CylinderGeometry(18, 20, 10, 6), wallMat);
+      const centerHub = new THREE.Mesh(new THREE.CylinderGeometry(14, 16, 10, 6), wallMat);
       centerHub.position.set(0, 5, 0); centerHub.castShadow = true; mapObjectsGroup.add(centerHub); obstacleMeshes.push(centerHub);
-      registerSolidBox(-18, 18, -18, 18, 0, 10);
+      registerSolidBox(-14, 14, -14, 14, 0, 10);
 
       // Central Spire Light
       const spire = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 3, 35, 12), trimMat);
       spire.position.set(0, 22.5, 0); mapObjectsGroup.add(spire);
 
-      // 4 Floating Anti-Gravity Battle Platforms at height y=12
-      [{x:65,z:65},{x:-65,z:65},{x:65,z:-65},{x:-65,z:-65}].forEach(fp => {
-        const plat = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, 2, 8), coverMat);
-        plat.position.set(fp.x, 12, fp.z); plat.castShadow = true; mapObjectsGroup.add(plat); obstacleMeshes.push(plat);
-        registerSolidBox(fp.x-14, fp.x+14, fp.z-14, fp.z+14, 11, 13);
-        const pRing = new THREE.Mesh(new THREE.RingGeometry(16, 17.5, 16), trimMat);
-        pRing.rotation.x = -Math.PI/2; pRing.position.set(fp.x, 13.05, fp.z); mapObjectsGroup.add(pRing);
+      // 4 Outer Docking Bunkers
+      [{x:85,z:0},{x:-85,z:0},{x:0,z:85},{x:0,z:-85}].forEach(sp => {
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(10, 12, 14, 12), wallMat);
+        base.position.set(sp.x, 7, sp.z); mapObjectsGroup.add(base); obstacleMeshes.push(base);
+        registerSolidBox(sp.x-10, sp.x+10, sp.z-10, sp.z+10, 0, 14);
       });
 
-      // 4 Satellite Dish Bunkers
-      [{x:95,z:0},{x:-95,z:0},{x:0,z:95},{x:0,z:-95}].forEach(sp => {
-        const base = new THREE.Mesh(new THREE.CylinderGeometry(12, 14, 16, 12), wallMat);
-        base.position.set(sp.x, 8, sp.z); mapObjectsGroup.add(base); obstacleMeshes.push(base);
-        registerSolidBox(sp.x-12, sp.x+12, sp.z-12, sp.z+12, 0, 16);
-      });
-
-      // High-Velocity Jump Pads to floating platforms
+      // Jump Pads
       [new THREE.Vector3(45,.2,45),new THREE.Vector3(-45,.2,-45),new THREE.Vector3(45,.2,-45),new THREE.Vector3(-45,.2,45),
-       new THREE.Vector3(0,.2,30),new THREE.Vector3(0,.2,-30),new THREE.Vector3(30,.2,0),new THREE.Vector3(-30,.2,0)
+       new THREE.Vector3(0,.2,35),new THREE.Vector3(0,.2,-35),new THREE.Vector3(35,.2,0),new THREE.Vector3(-35,.2,0)
       ].forEach(pos => createJumpPadMesh(pos, cfg.gridColor));
     }
 
@@ -1089,17 +1144,17 @@
       const lavaGlowMat = new THREE.MeshBasicMaterial({ color: 0xff3300 });
 
       // Central Molten Spire
-      const crater = new THREE.Mesh(new THREE.CylinderGeometry(14, 26, 18, 10), magmaRockMat);
-      crater.position.set(0, 9, 0); crater.castShadow = true; mapObjectsGroup.add(crater); obstacleMeshes.push(crater);
-      registerSolidBox(-18, 18, -18, 18, 0, 18);
+      const crater = new THREE.Mesh(new THREE.CylinderGeometry(12, 20, 16, 10), magmaRockMat);
+      crater.position.set(0, 8, 0); crater.castShadow = true; mapObjectsGroup.add(crater); obstacleMeshes.push(crater);
+      registerSolidBox(-14, 14, -14, 14, 0, 16);
 
-      const lavaCore = new THREE.Mesh(new THREE.CircleGeometry(12, 16), lavaGlowMat);
-      lavaCore.rotation.x = -Math.PI/2; lavaCore.position.set(0, 18.1, 0); mapObjectsGroup.add(lavaCore);
+      const lavaCore = new THREE.Mesh(new THREE.CircleGeometry(10, 16), lavaGlowMat);
+      lavaCore.rotation.x = -Math.PI/2; lavaCore.position.set(0, 16.1, 0); mapObjectsGroup.add(lavaCore);
 
-      // 8 Jagged Basalt Rock Monoliths of varying heights
+      // 6 Jagged Basalt Rock Monoliths
       const pillars = [
-        {x:55,z:40,w:14,h:24,d:14},{x:-55,z:40,w:14,h:20,d:14},{x:55,z:-40,w:12,h:28,d:12},{x:-55,z:-40,w:15,h:22,d:15},
-        {x:85,z:85,w:18,h:32,d:18},{x:-85,z:85,w:18,h:26,d:18},{x:85,z:-85,w:20,h:30,d:20},{x:-85,z:-85,w:18,h:34,d:18}
+        {x:60,z:40,w:14,h:22,d:14},{x:-60,z:40,w:14,h:20,d:14},{x:60,z:-40,w:12,h:24,d:12},{x:-60,z:-40,w:14,h:20,d:14},
+        {x:85,z:85,w:18,h:30,d:18},{x:-85,z:85,w:18,h:26,d:18}
       ];
       pillars.forEach(p => {
         const rock = new THREE.Mesh(new THREE.BoxGeometry(p.w, p.h, p.d), magmaRockMat);
@@ -1107,16 +1162,9 @@
         registerSolidBox(p.x-p.w/2, p.x+p.w/2, p.z-p.d/2, p.z+p.d/2, 0, p.h);
       });
 
-      // 4 Obsidian Blast Walls
-      [{x:0,z:55,w:36,h:8,d:6},{x:0,z:-55,w:36,h:8,d:6},{x:55,z:0,w:6,h:8,d:36},{x:-55,z:0,w:6,h:8,d:36}].forEach(w => {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(w.w, w.h, w.d), coverMat);
-        wall.position.set(w.x, w.h/2, w.z); mapObjectsGroup.add(wall); obstacleMeshes.push(wall);
-        registerSolidBox(w.x-w.w/2, w.x+w.w/2, w.z-w.d/2, w.z+w.d/2, 0, w.h);
-      });
-
       // Magma Geyser Launch Pads
-      [new THREE.Vector3(35,.2,35),new THREE.Vector3(-35,.2,-35),new THREE.Vector3(35,.2,-35),new THREE.Vector3(-35,.2,35),
-       new THREE.Vector3(0,.2,32),new THREE.Vector3(0,.2,-32),new THREE.Vector3(32,.2,0),new THREE.Vector3(-32,.2,0)
+      [new THREE.Vector3(40,.2,40),new THREE.Vector3(-40,.2,-40),new THREE.Vector3(40,.2,-40),new THREE.Vector3(-40,.2,40),
+       new THREE.Vector3(0,.2,40),new THREE.Vector3(0,.2,-40),new THREE.Vector3(40,.2,0),new THREE.Vector3(-40,.2,0)
       ].forEach(pos => createJumpPadMesh(pos, 0xff5500));
     }
 
@@ -1128,9 +1176,9 @@
 
       // Stepped Central Cyber Pyramid
       [
-        { w: 60, h: 3, y: 1.5 },
-        { w: 42, h: 3, y: 4.5 },
-        { w: 24, h: 3, y: 7.5 }
+        { w: 46, h: 3, y: 1.5 },
+        { w: 32, h: 3, y: 4.5 },
+        { w: 18, h: 3, y: 7.5 }
       ].forEach(step => {
         const sMesh = new THREE.Mesh(new THREE.BoxGeometry(step.w, step.h, step.w), gridBoxMat);
         sMesh.position.set(0, step.y, 0); mapObjectsGroup.add(sMesh); obstacleMeshes.push(sMesh);
@@ -1139,13 +1187,11 @@
         sTrim.position.set(0, step.y + step.h/2 + 0.2, 0); mapObjectsGroup.add(sTrim);
       });
 
-      // 8 Monolithic Digital Towers
-      [{x:75,z:75},{x:-75,z:75},{x:75,z:-75},{x:-75,z:-75},{x:90,z:0},{x:-90,z:0},{x:0,z:90},{x:0,z:-90}].forEach(mp => {
-        const mon = new THREE.Mesh(new THREE.BoxGeometry(10, 36, 10), gridBoxMat);
-        mon.position.set(mp.x, 18, mp.z); mapObjectsGroup.add(mon); obstacleMeshes.push(mon);
-        registerSolidBox(mp.x-5, mp.x+5, mp.z-5, mp.z+5, 0, 36);
-        const ring = new THREE.Mesh(new THREE.BoxGeometry(11, 1, 11), trimMat);
-        ring.position.set(mp.x, 30, mp.z); mapObjectsGroup.add(ring);
+      // 6 Monolithic Digital Towers
+      [{x:75,z:75},{x:-75,z:75},{x:75,z:-75},{x:-75,z:-75},{x:90,z:0},{x:-90,z:0}].forEach(mp => {
+        const mon = new THREE.Mesh(new THREE.BoxGeometry(10, 32, 10), gridBoxMat);
+        mon.position.set(mp.x, 16, mp.z); mapObjectsGroup.add(mon); obstacleMeshes.push(mon);
+        registerSolidBox(mp.x-5, mp.x+5, mp.z-5, mp.z+5, 0, 32);
       });
 
       // Matrix Warp Jump Pads
@@ -1297,8 +1343,8 @@
     const cGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.09, 8);
     const casing = new THREE.Mesh(cGeo, new THREE.MeshStandardMaterial({ color: 0xffcc00, metalness: 0.9, roughness: 0.1 }));
     const sp = camera.position.clone();
-    const fwd = new THREE.Vector3(0,0,-1).applyEuler(camera.rotation);
-    const rt = new THREE.Vector3(1,0,0).applyEuler(camera.rotation);
+    const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+    const rt = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
     sp.addScaledVector(fwd, 0.4).addScaledVector(rt, 0.25).add(new THREE.Vector3(0,-0.2,0));
     casing.position.copy(sp);
     const vel = rt.clone().multiplyScalar(4+Math.random()*2).add(new THREE.Vector3(0, 3+Math.random()*2, 0)).addScaledVector(fwd, (Math.random()-0.5)*2);
@@ -1331,8 +1377,11 @@
     const pellets = wp.pellets || 1;
     const spreadMult = isAiming ? 0.3 : 1.0;
 
+    camera.position.set(player.pos.x, player.pos.y, player.pos.z);
+    camera.updateMatrixWorld(true);
+
     for (let p = 0; p < pellets; p++) {
-      const dir = new THREE.Vector3(0,0,-1).applyEuler(camera.rotation);
+      const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
       dir.x += (Math.random()-0.5)*wp.spread*spreadMult;
       dir.y += (Math.random()-0.5)*wp.spread*spreadMult;
       dir.z += (Math.random()-0.5)*wp.spread*spreadMult;
@@ -1344,6 +1393,7 @@
       const targetMeshes = [];
       const meshToPlayerMap = new Map();
       remotePlayers.forEach(rp => {
+        rp.mesh.updateMatrixWorld(true);
         rp.mesh.traverse(c => {
           if (c.isMesh) {
             targetMeshes.push(c);
@@ -1464,7 +1514,7 @@
         wpType: wpType || 'rifle',
         isCrit: !!isCrit
       });
-      player.pos.set((Math.random()-0.5)*120, 6, (Math.random()-0.5)*120);
+      spawnLocalPlayer();
       player.hp = 100; player.shield = 100;
       document.getElementById('hpText').textContent = '100'; document.getElementById('hpBar').style.width = '100%';
       document.getElementById('shieldText').textContent = '100'; document.getElementById('shieldBar').style.width = '100%';
@@ -1529,12 +1579,16 @@
   function onResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
 
   function checkPlayerCollision(nx, nz, cy) {
-    const hb = (ARENA_SIZE/2)-3;
+    const hb = (ARENA_SIZE / 2) - 4;
     if (nx < -hb || nx > hb || nz < -hb || nz > hb) return true;
     for (let i = 0; i < collisionBoxes.length; i++) {
       const b = collisionBoxes[i];
-      if (cy >= b.minY && cy <= b.maxY+1.0) {
-        if (nx+PLAYER_RADIUS > b.minX && nx-PLAYER_RADIUS < b.maxX && nz+PLAYER_RADIUS > b.minZ && nz-PLAYER_RADIUS < b.maxZ) return true;
+      // Check vertical overlap
+      if (cy + 0.2 >= b.minY && cy - 1.4 <= b.maxY) {
+        if (nx + PLAYER_RADIUS > b.minX && nx - PLAYER_RADIUS < b.maxX &&
+            nz + PLAYER_RADIUS > b.minZ && nz - PLAYER_RADIUS < b.maxZ) {
+          return true;
+        }
       }
     }
     return false;
@@ -1600,8 +1654,15 @@
         if (isMoving && player.onGround) audio.playFootstep();
       }
 
-      const nx = player.pos.x + vx * dt; if (!checkPlayerCollision(nx, player.pos.z, player.pos.y)) player.pos.x = nx;
-      const nz = player.pos.z + vz * dt; if (!checkPlayerCollision(player.pos.x, nz, player.pos.y)) player.pos.z = nz;
+      // Smooth horizontal collision sliding
+      const nx = player.pos.x + vx * dt;
+      if (!checkPlayerCollision(nx, player.pos.z, player.pos.y)) {
+        player.pos.x = nx;
+      }
+      const nz = player.pos.z + vz * dt;
+      if (!checkPlayerCollision(player.pos.x, nz, player.pos.y)) {
+        player.pos.z = nz;
+      }
 
       // Gravity & Jump Pads
       player.vel.y -= cfg.gravity * dt;
