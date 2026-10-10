@@ -1,5 +1,5 @@
 // VECK.IO client — rendering, prediction, interpolation, weapons, HUD.
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import * as THREE from './vendor/three.module.min.js';
 
 const V = window.VECK;
 const { PLAYER, WEAPONS, SKINS, getMap, moveBody, checkPads, rayMap, rayPlayer } = V;
@@ -81,7 +81,13 @@ const sound = new Sound();
 
 // ═════════════ RENDERER ═════════════
 const canvas = $('game');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality === 'high', powerPreference: 'high-performance', stencil: false });
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality === 'high', powerPreference: 'high-performance', stencil: false });
+} catch (e) {
+  window.__veckFail && window.__veckFail('Your browser could not start WebGL (3D graphics). Enable hardware acceleration in browser settings, or try Chrome.');
+  throw e;
+}
 renderer.autoClear = false;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 400);
@@ -102,7 +108,7 @@ function basePixelRatio() {
   if (settings.quality === 'low') return Math.min(dpr, 1) * 0.75;
   if (settings.quality === 'high') return Math.min(dpr, 2);
   if (settings.quality === 'medium') return Math.min(dpr, 1.25);
-  return Math.min(dpr, IS_TOUCH ? 1.25 : 1.5);
+  return Math.min(dpr, IS_TOUCH ? 1 : 1.25);
 }
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
@@ -245,7 +251,8 @@ function buildWorld(key) {
     world.add(g); pickupMeshes.push(g);
   });
 
-  // Stars
+  // Stars (skipped on phones / low quality to save GPU)
+  if (!(IS_TOUCH || settings.quality === 'low')) {
   const starPos = new Float32Array(500 * 3);
   for (let i = 0; i < 500; i++) {
     const u = Math.random() * Math.PI * 2, v = Math.random() * 0.45 + 0.05, r = 300;
@@ -255,6 +262,7 @@ function buildWorld(key) {
   }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
   world.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, fog: false, sizeAttenuation: false, transparent: true, opacity: 0.7 })));
+  }
 
   buildMinimapBase();
   $('mapName').textContent = '◈ ' + map.name;
@@ -438,7 +446,7 @@ function spawnTracer(from, to, color, width = 0.035) {
   m.material.color.setHex(color); m.material.opacity = 0.9;
   m.life = 0.09; m.maxLife = 0.09; m.visible = true;
 }
-const P_MAX = 600;
+const P_MAX = IS_TOUCH ? 250 : 500;
 const pPos = new Float32Array(P_MAX * 3), pCol = new Float32Array(P_MAX * 3);
 const pVel = new Float32Array(P_MAX * 3), pLife = new Float32Array(P_MAX);
 for (let i = 0; i < P_MAX; i++) pPos[i * 3 + 1] = -999;
@@ -1556,5 +1564,6 @@ window.__veck = { me, avatars, net, clock, get map() { return map; }, get playin
 
 buildWorld('NEON');
 camera.position.set(30, 14, 30); camera.lookAt(0, 0, 0);
+window.__veckLoaded = true;
 $('loading').classList.add('hidden');
 requestAnimationFrame(frame);

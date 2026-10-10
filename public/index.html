@@ -8,7 +8,7 @@
   <title>VECK.IO — Multiplayer Arena FPS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="modulepreload" href="vendor/three.module.min.js">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@600;700&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 4l12 24L28 4h-6l-6 13L10 4z' fill='%2300f0ff'/%3E%3C/svg%3E">
   <style>
@@ -226,7 +226,19 @@
 </head>
 <body>
   <canvas id="game"></canvas>
-  <div id="loading">LOADING…</div>
+  <div id="loading"><div style="text-align:center;padding:20px"><div id="loadingText">LOADING…</div><div id="loadingErr" style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0;color:#ff6b9a;margin-top:14px;max-width:520px"></div></div></div>
+  <script>
+    // Show load problems instead of an endless loading screen.
+    window.__veckFail = function (msg) {
+      if (window.__veckLoaded) return;
+      var t = document.getElementById('loadingText'), e = document.getElementById('loadingErr');
+      if (t) t.textContent = 'COULD NOT START';
+      if (e) e.innerHTML = String(msg).replace(/</g, '&lt;') + '<br><br><button onclick="location.reload()" style="padding:10px 18px;border-radius:8px;border:1px solid #00f0ff;background:#0a1028;color:#00f0ff;font-family:inherit;cursor:pointer">RELOAD</button>';
+    };
+    window.addEventListener('error', function (ev) { window.__veckFail(ev.message || 'Script failed to load'); });
+    window.addEventListener('unhandledrejection', function (ev) { window.__veckFail(ev.reason && ev.reason.message || 'Startup error'); });
+    setTimeout(function () { window.__veckFail('The game is taking too long to load. Check your connection and reload.'); }, 20000);
+  </script>
 
   <!-- ───── MENU ───── -->
   <div id="menu">
@@ -341,6 +353,6 @@
   <script src="config.js"></script>
   <script src="shared.js"></script>
   <script src="room.js"></script>
-  <script type="module" src="game.js"></script>
+  <script type="module" src="game.js" onerror="window.__veckFail('game.js failed to download')"></script>
 </body>
 </html>
