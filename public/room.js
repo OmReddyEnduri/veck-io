@@ -6,7 +6,7 @@
   else root.VECK = Object.assign(root.VECK || {}, api);
 })(typeof self !== 'undefined' ? self : this, function (V) {
   'use strict';
-  const { PLAYER, WEAPONS, MAP_ORDER, getMap, moveBody, checkPads, rayMap, weaponDamage, sanitizeName } = V;
+  const { PLAYER, WEAPONS, MAP_ORDER, getMap, moveBody, checkPads, rayMap, weaponDamage, sanitizeName, isClear } = V;
 
   const TICK_MS = 33;
   const MATCH_MS = 6 * 60 * 1000;
@@ -27,7 +27,7 @@
       this.maxPlayers = opts.maxPlayers ?? 12;
       this.players = new Map();       // id -> player
       this.nextId = 1;
-      this.mapIdx = Math.floor(Math.random() * MAP_ORDER.length);
+      this.mapIdx = opts.map && MAP_ORDER.includes(opts.map) ? MAP_ORDER.indexOf(opts.map) : Math.floor(Math.random() * MAP_ORDER.length);
       this.state = 'play';
       this.startMatch(true);
     }
@@ -136,24 +136,29 @@
     }
 
     pickSpawn(p) {
-      let best = null, bestScore = -1;
-      for (const s of this.map.spawns) {
+      // Random open spot anywhere on the map; among a few random candidates prefer ones away from others.
+      const H = this.map.H - 4;
+      let best = null, bestScore = -1, valid = 0;
+      for (let i = 0; i < 60 && valid < 6; i++) {
+        const x = (Math.random() * 2 - 1) * H, z = (Math.random() * 2 - 1) * H;
+        if (!isClear(this.map, x, z, 1)) continue;
+        valid++;
         let minD = 1e9;
         for (const q of this.players.values()) {
           if (q === p || !q.alive) continue;
-          const d = (q.x - s.x) ** 2 + (q.z - s.z) ** 2;
-          if (d < minD) minD = d;
+          minD = Math.min(minD, Math.hypot(q.x - x, q.z - z));
         }
-        const score = minD + Math.random() * 120;
-        if (score > bestScore) { bestScore = score; best = s; }
+        const score = Math.min(minD, 45) + Math.random() * 25;
+        if (score > bestScore) { bestScore = score; best = { x, y: 0, z }; }
       }
+      if (!best) best = this.map.spawns[Math.floor(Math.random() * this.map.spawns.length)];
       return best || { x: 0, y: 0, z: 0 };
     }
 
     spawn(p, silent) {
       const s = this.pickSpawn(p);
       p.x = s.x; p.y = s.y; p.z = s.z;
-      p.yaw = Math.atan2(-s.x, -s.z); // face the middle
+      p.yaw = Math.random() * Math.PI * 2;
       p.pitch = 0;
       p.hp = PLAYER.maxHp; p.alive = true; p.sp++;
       p.protUntil = now() + PLAYER.spawnProtect;

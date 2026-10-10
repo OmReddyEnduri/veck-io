@@ -4,11 +4,13 @@ A fast, Veck.io-style browser shooter: **Three.js** client on **Vercel**, author
 
 ## Features
 - Free-for-all deathmatch: first to 30 kills or 6 minutes, then a scoreboard and map rotation
-- 4 maps (Neon Metropolis, Orbital Apex (low gravity), Volcanic Core, Cyber Matrix), with jump pads, pickups and parkour crates
+- 9 maps, each with its own look: Squid Playground, Downtown Sprawl, Frozen Depot, Sky Gardens (low gravity), Desert Ruins, Neon Metropolis, Orbital Apex (low gravity), Volcanic Core, Cyber Matrix
 - 4 weapons: Pulse Rifle, Spectre SMG, Breacher Shotgun, Ion Sniper (with a scope); headshots and damage falloff
 - Movement: sprint, jump (with coyote time and a jump buffer), slide, dash, air control
 - Weapon animations: magazine drop and insert, bolt and pump cycling, ejected shell casings, recoil, sway and bob, a draw animation
-- Server-side bots fill rooms with fewer than 4 players; there is also an offline practice mode
+- Online rooms are real players only; bots appear only in offline practice (with a map picker)
+- Random spawn points anywhere on the map, away from other players
+- Customizable crosshair (style, color, size)
 - Public quick play or private room codes, in-game chat, killfeed, killstreaks, minimap radar, Tab scoreboard
 - Mobile touch controls (joystick, swipe to aim, action buttons)
 

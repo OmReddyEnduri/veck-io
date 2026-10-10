@@ -12,7 +12,7 @@ const IS_TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) 
 if (IS_TOUCH) document.body.classList.add('is-touch');
 
 // ═════════════ SETTINGS ═════════════
-const settings = Object.assign({ name: '', skin: 'CYBER', room: 'PUBLIC', sens: 1, fov: 95, volume: 0.6, quality: 'auto' }, loadSettings());
+const settings = Object.assign({ name: '', skin: 'CYBER', room: 'PUBLIC', sens: 1, fov: 95, volume: 0.6, quality: 'auto', chStyle: 'crossdot', chColor: '#00f0ff', chSize: 1 }, loadSettings());
 function loadSettings() { try { return JSON.parse(localStorage.getItem('veck_settings') || '{}'); } catch { return {}; } }
 function saveSettings() { try { localStorage.setItem('veck_settings', JSON.stringify(settings)); } catch {} }
 
@@ -140,6 +140,41 @@ function gridTexture(lineColor) {
   t.anisotropy = 4;
   return t;
 }
+// Procedural floor textures so every map looks different.
+function floorTexture(kind, base, accent) {
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d');
+  const col = (n, a = 1) => { const x = new THREE.Color(n); return `rgba(${x.r * 255 | 0},${x.g * 255 | 0},${x.b * 255 | 0},${a})`; };
+  g.fillStyle = col(base); g.fillRect(0, 0, N, N);
+  const speckle = (n, size, color, alpha) => { for (let i = 0; i < n; i++) { g.fillStyle = col(color, alpha * Math.random()); g.fillRect(Math.random() * N, Math.random() * N, size, size); } };
+  if (kind === 'plates') {
+    g.strokeStyle = col(accent, 0.35); g.lineWidth = 2;
+    for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, N); g.moveTo(0, i * 64); g.lineTo(N, i * 64); g.stroke(); }
+    g.fillStyle = col(accent, 0.5); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillRect(i * 64 + 6, j * 64 + 6, 4, 4); g.fillRect(i * 64 + 54, j * 64 + 54, 4, 4); }
+    speckle(400, 2, 0xffffff, 0.06);
+  } else if (kind === 'rock') {
+    speckle(3000, 3, 0x000000, 0.35);
+    g.strokeStyle = col(accent, 0.8); g.lineWidth = 2; g.shadowColor = col(accent); g.shadowBlur = 8;
+    for (let k = 0; k < 7; k++) { g.beginPath(); let x = Math.random() * N, y = Math.random() * N; g.moveTo(x, y); for (let i = 0; i < 6; i++) { x += (Math.random() - 0.5) * 70; y += (Math.random() - 0.5) * 70; g.lineTo(x, y); } g.stroke(); }
+  } else if (kind === 'asphalt') {
+    speckle(5000, 2, 0x000000, 0.3); speckle(1500, 2, 0xffffff, 0.08);
+    g.fillStyle = 'rgba(255,220,80,0.55)'; for (let i = 0; i < 4; i++) g.fillRect(124, i * 64 + 8, 8, 40);
+    g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 3; g.strokeRect(2, 2, N - 4, N - 4);
+  } else if (kind === 'snow') {
+    speckle(4000, 3, 0xffffff, 0.5); speckle(800, 2, 0x8aa4c0, 0.25);
+    g.strokeStyle = 'rgba(120,140,170,0.25)'; g.lineWidth = 6; for (const x of [70, 90, 170, 190]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 10, N); g.stroke(); }
+  } else if (kind === 'grass') {
+    for (let i = 0; i < 6000; i++) { const t = Math.random(); g.fillStyle = `rgba(${40 + t * 60 | 0},${110 + t * 90 | 0},${40 + t * 40 | 0},0.6)`; g.fillRect(Math.random() * N, Math.random() * N, 2, 3 + Math.random() * 3); }
+    g.fillStyle = 'rgba(255,240,120,0.6)'; for (let i = 0; i < 30; i++) g.fillRect(Math.random() * N, Math.random() * N, 3, 3);
+  } else if (kind === 'sand') {
+    speckle(5000, 2, 0x8a6a3a, 0.35); speckle(2000, 2, 0xfff0d0, 0.3);
+    g.strokeStyle = 'rgba(150,110,60,0.25)'; g.lineWidth = 3;
+    for (let y = 10; y < N; y += 22) { g.beginPath(); for (let x = 0; x <= N; x += 8) g.lineTo(x, y + Math.sin((x / N) * Math.PI * 2) * 6); g.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
 function glowTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
@@ -175,11 +210,20 @@ function buildWorld(key) {
   hemi.color.setHex(map.ambient); hemi.groundColor.setHex(map.ground);
   sun.color.setHex(map.sun);
 
-  // Floor with neon grid
+  // Floor: neon grid on cyber maps, a themed texture elsewhere
   const H = map.H;
-  const gtex = gridTexture(hex(map.grid));
-  gtex.repeat.set(H / 2, H / 2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(H * 2 + 4, H * 2 + 4), new THREE.MeshLambertMaterial({ color: map.ground, emissive: map.grid, emissiveMap: gtex, emissiveIntensity: 0.55 }));
+  let floorMat;
+  if (map.floor === 'grid' || !map.floor) {
+    const gtex = gridTexture(hex(map.grid));
+    gtex.repeat.set(H / 2, H / 2);
+    floorMat = new THREE.MeshLambertMaterial({ color: map.ground, emissive: map.grid, emissiveMap: gtex, emissiveIntensity: 0.55 });
+  } else {
+    const ftex = floorTexture(map.floor, map.ground, map.grid);
+    ftex.repeat.set(H / 6, H / 6);
+    floorMat = new THREE.MeshLambertMaterial({ map: ftex });
+    if (map.floor === 'rock') { floorMat.emissive = new THREE.Color(map.grid); floorMat.emissiveMap = ftex; floorMat.emissiveIntensity = 0.35; }
+  }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(H * 2 + 4, H * 2 + 4), floorMat);
   floor.rotation.x = -Math.PI / 2;
   world.add(floor);
 
@@ -208,17 +252,9 @@ function buildWorld(key) {
     for (const x of xs) for (const z of zs) { push(x, ys[0], z); push(x, ys[1], z); }
   }
   const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  world.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: map.edge, transparent: true, opacity: 0.75 })));
+  world.add(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: map.edge, transparent: true, opacity: map.edges === false ? 0.22 : 0.75 })));
 
-  // Background skyline outside the arena (single instanced draw)
-  const sky = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(map.sky).multiplyScalar(1.7) }), 64);
-  for (let i = 0; i < 64; i++) {
-    const a = (i / 64) * Math.PI * 2, d = H + 30 + (i * 37 % 40);
-    const w = 8 + (i * 13 % 12), h = 20 + (i * 29 % 60);
-    m4.makeScale(w, h, w); m4.setPosition(Math.cos(a) * d, h / 2, Math.sin(a) * d);
-    sky.setMatrixAt(i, m4);
-  }
-  world.add(sky);
+  buildDeco(m4);
 
   // Jump pads
   const padGeo = new THREE.CylinderGeometry(1.35, 1.45, 0.14, 24);
@@ -252,7 +288,7 @@ function buildWorld(key) {
   });
 
   // Stars (skipped on phones / low quality to save GPU)
-  if (!(IS_TOUCH || settings.quality === 'low')) {
+  if (!(IS_TOUCH || settings.quality === 'low') && map.edges !== false) {
   const starPos = new Float32Array(500 * 3);
   for (let i = 0; i < 500; i++) {
     const u = Math.random() * Math.PI * 2, v = Math.random() * 0.45 + 0.05, r = 300;
@@ -267,6 +303,134 @@ function buildWorld(key) {
   buildMinimapBase();
   $('mapName').textContent = '◈ ' + map.name;
   renderer.compile(scene, camera);
+}
+
+// Per-map scenery outside / around the arena (all cheap: instanced or a handful of meshes).
+const decoAnim = [];
+function buildDeco(m4) {
+  const H = map.H;
+  decoAnim.length = 0;
+  hemi.intensity = map.edges === false ? 2.6 : 2.1;
+  sun.intensity = map.edges === false ? 2.2 : 1.4;
+  const ring = (n, fn) => { for (let i = 0; i < n; i++) fn(i, (i / n) * Math.PI * 2); };
+  if (map.deco === 'skyline' || map.deco === 'rain') {
+    const n = map.deco === 'skyline' ? 80 : 50;
+    const sky = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(map.sky).multiplyScalar(1.8) }), n);
+    ring(n, (i, a) => { const d = H + 25 + (i * 37 % 50), w = 8 + (i * 13 % 14), h = 25 + (i * 29 % 80); m4.makeScale(w, h, w); m4.setPosition(Math.cos(a) * d, h / 2, Math.sin(a) * d); sky.setMatrixAt(i, m4); });
+    world.add(sky);
+    // Neon window strips on the skyline
+    const lights = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: map.edge }), n);
+    ring(n, (i, a) => { const d = H + 24 + (i * 37 % 50), h = 25 + (i * 29 % 80); m4.makeScale(6, 0.4, 6); m4.setPosition(Math.cos(a) * (d - 0.5), h * (0.4 + (i % 5) * 0.1), Math.sin(a) * (d - 0.5)); lights.setMatrixAt(i, m4); });
+    world.add(lights);
+  }
+  if (map.deco === 'rain') {
+    const n = IS_TOUCH ? 400 : 1200, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() * 2 - 1) * H; pos[i * 3 + 1] = Math.random() * 40; pos[i * 3 + 2] = (Math.random() * 2 - 1) * H; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: map.grid, size: 0.12, transparent: true, opacity: 0.7 }));
+    world.add(pts);
+    decoAnim.push((dt) => { for (let i = 1; i < pos.length; i += 3) { pos[i] -= dt * 30; if (pos[i] < 0) pos[i] += 40; } g.attributes.position.needsUpdate = true; });
+  }
+  if (map.deco === 'snow') {
+    const n = IS_TOUCH ? 500 : 1500, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() * 2 - 1) * H; pos[i * 3 + 1] = Math.random() * 30; pos[i * 3 + 2] = (Math.random() * 2 - 1) * H; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    world.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.18, transparent: true, opacity: 0.9 })));
+    decoAnim.push((dt, t) => { for (let i = 0; i < pos.length; i += 3) { pos[i + 1] -= dt * 2.5; pos[i] += Math.sin(t + i) * dt * 0.6; if (pos[i + 1] < 0) pos[i + 1] += 30; } g.attributes.position.needsUpdate = true; });
+    // Snowy mountains around the yard
+    const mnt = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 5), new THREE.MeshLambertMaterial({ color: 0xe8f0f8 }), 24);
+    ring(24, (i, a) => { const d = H + 50 + (i * 23 % 40), s = 35 + (i * 17 % 30); m4.makeScale(s, s * 0.9, s); m4.setPosition(Math.cos(a) * d, s * 0.45, Math.sin(a) * d); mnt.setMatrixAt(i, m4); });
+    world.add(mnt);
+  }
+  if (map.deco === 'clouds') {
+    const cl = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9ab, emissiveIntensity: 0.5 }), 36);
+    ring(36, (i, a) => { const d = H + 30 + (i * 31 % 60), s = 10 + (i * 7 % 12); m4.makeScale(s * 1.8, s * 0.7, s); m4.setPosition(Math.cos(a) * d, 12 + (i * 11 % 30), Math.sin(a) * d); cl.setMatrixAt(i, m4); });
+    world.add(cl);
+    const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(12, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false }));
+    sunMesh.position.set(-150, 120, -200); world.add(sunMesh);
+  }
+  if (map.deco === 'dunes') {
+    const du = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: map.ground }), 30);
+    ring(30, (i, a) => { const d = H + 30 + (i * 29 % 50), s = 30 + (i * 13 % 30); m4.makeScale(s * 1.6, s * 0.35, s); m4.setPosition(Math.cos(a) * d, 0, Math.sin(a) * d); du.setMatrixAt(i, m4); });
+    world.add(du);
+    const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(16, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: false }));
+    sunMesh.position.set(160, 70, -180); world.add(sunMesh);
+  }
+  if (map.deco === 'lava') {
+    // Glowing lava pools and rivers around the arena edge + rising embers.
+    const lavaMat = new THREE.MeshBasicMaterial({ color: 0xff5a10 });
+    const lava = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 18), lavaMat, 20);
+    ring(20, (i, a) => { const d = H + 12 + (i * 17 % 30), s = 10 + (i * 7 % 14); m4.makeRotationX(-Math.PI / 2); m4.scale(new THREE.Vector3(s, s, 1)); m4.setPosition(Math.cos(a) * d, 0.05, Math.sin(a) * d); lava.setMatrixAt(i, m4); });
+    world.add(lava);
+    const volc = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), new THREE.MeshLambertMaterial({ color: 0x2a0e08 }), 10);
+    ring(10, (i, a) => { const d = H + 60 + (i * 19 % 40), s = 40 + (i * 13 % 30); m4.makeScale(s, s, s); m4.setPosition(Math.cos(a + 0.3) * d, s / 2, Math.sin(a + 0.3) * d); volc.setMatrixAt(i, m4); });
+    world.add(volc);
+    const n = 300, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() * 2 - 1) * H; pos[i * 3 + 1] = Math.random() * 25; pos[i * 3 + 2] = (Math.random() * 2 - 1) * H; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    world.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xff7a20, size: 0.2, map: GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+    decoAnim.push((dt, t) => { for (let i = 1; i < pos.length; i += 3) { pos[i] += dt * 2; if (pos[i] > 25) pos[i] = 0; } g.attributes.position.needsUpdate = true; lavaMat.color.setHSL(0.05, 1, 0.5 + Math.sin(t * 2) * 0.05); });
+  }
+  if (map.deco === 'squid') {
+    // Painted sky mural: white clouds on the inside of the walls.
+    const cl = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }), 48);
+    for (let i = 0; i < 48; i++) {
+      const side = i % 4, k = Math.floor(i / 4), along = -H + 8 + k * ((2 * H - 16) / 11), y = 8 + (i * 7 % 10), r = 2.5 + (i * 3 % 4);
+      const rot = [0, Math.PI, -Math.PI / 2, Math.PI / 2][side];
+      m4.makeRotationY(rot); m4.scale(new THREE.Vector3(r * 1.8, r, 1));
+      const p = [[along, y, -H + 0.05], [along, y, H - 0.05], [H - 0.05, y, along], [-H + 0.05, y, along]][side];
+      m4.setPosition(p[0], p[1], p[2]); cl.setMatrixAt(i, m4);
+    }
+    world.add(cl);
+    // The giant doll ("red light, green light"): head turns around every few seconds.
+    const doll = new THREE.Group();
+    const dress = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.6, 4.5, 16), new THREE.MeshLambertMaterial({ color: 0xff8a1f }));
+    dress.position.y = 4.25;
+    const shirt = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 2, 16), new THREE.MeshLambertMaterial({ color: 0xffd23f }));
+    shirt.position.y = 7.4;
+    const legM = new THREE.MeshLambertMaterial({ color: 0xffe0c8 });
+    for (const x of [-0.7, 0.7]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 2.2, 8), legM); l.position.set(x, 1.1, 0); doll.add(l); }
+    for (const x of [-1.5, 1.5]) { const a = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 2.6, 8), legM); a.position.set(x, 6.6, 0); a.rotation.z = x > 0 ? 0.25 : -0.25; doll.add(a); }
+    const head = new THREE.Group(); head.position.y = 9.4;
+    const face = new THREE.Mesh(new THREE.SphereGeometry(1.35, 20, 16), legM); head.add(face);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(1.45, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshLambertMaterial({ color: 0x1a1210 }));
+    hair.rotation.x = 0.5; head.add(hair);
+    for (const x of [-1.3, 1.3]) { const tail = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), hair.material); tail.position.set(x, -0.3, 0.6); tail.scale.set(1, 1.5, 1); head.add(tail); }
+    const eyeM = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    for (const x of [-0.45, 0.45]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), eyeM); e.position.set(x, 0.1, -1.25); head.add(e); }
+    const cheekM = new THREE.MeshBasicMaterial({ color: 0xff8aa0 });
+    for (const x of [-0.75, 0.75]) { const c = new THREE.Mesh(new THREE.CircleGeometry(0.22, 10), cheekM); c.position.set(x, -0.3, -1.22); c.rotation.y = Math.PI; head.add(c); }
+    doll.add(dress, shirt, head);
+    doll.position.set(0, 2, -H + 7);
+    world.add(doll);
+    // Pink guards with circle / triangle / square masks
+    const guardM = new THREE.MeshLambertMaterial({ color: 0xe0386e }), maskM = new THREE.MeshBasicMaterial({ color: 0x111111 }), symM = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const syms = [new THREE.RingGeometry(0.12, 0.17, 16), new THREE.RingGeometry(0.12, 0.17, 3), new THREE.RingGeometry(0.12, 0.17, 4, 1, Math.PI / 4)];
+    [[-8, -H + 6], [8, -H + 6], [-H + 4, 0], [H - 4, 0]].forEach(([x, z], i) => {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.5, 0.5), guardM); body.position.y = 0.95;
+      const hd = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), guardM); hd.position.y = 1.95;
+      const mask = new THREE.Mesh(new THREE.CircleGeometry(0.27, 16), maskM); mask.position.set(0, 1.95, 0.29);
+      const sym = new THREE.Mesh(syms[i % 3], symM); sym.position.set(0, 1.95, 0.3);
+      g.add(body, hd, mask, sym);
+      g.position.set(x, 0, z); g.lookAt(0, 0, 0);
+      world.add(g);
+    });
+    // Animation: head faces the wall ("green light"), then snaps around to face the arena ("red light").
+    decoAnim.push((dt, t) => {
+      const cycle = t % 9;
+      const target = cycle < 5 ? 0 : Math.PI;
+      head.rotation.y += (target - head.rotation.y) * Math.min(1, dt * (target === Math.PI ? 10 : 3));
+    });
+  }
+  if (map.deco === 'planet') {
+    const planet = new THREE.Mesh(new THREE.SphereGeometry(70, 32, 24), new THREE.MeshLambertMaterial({ color: 0x6a4cc0, emissive: 0x2a1060 }));
+    planet.position.set(-220, 90, -260); world.add(planet);
+    const ringM = new THREE.Mesh(new THREE.RingGeometry(90, 120, 48), new THREE.MeshBasicMaterial({ color: 0xc8a0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.35, fog: false }));
+    ringM.position.copy(planet.position); ringM.rotation.set(1.2, 0.3, 0); world.add(ringM);
+    planet.material.fog = false;
+    decoAnim.push((dt) => { planet.rotation.y += dt * 0.02; });
+  }
 }
 
 function buildMinimapBase() {
@@ -588,7 +752,7 @@ class Net {
   }
   local(join) {
     this.offline = true;
-    const room = this.room = new V.Room('OFFLINE', { botFill: 6 });
+    const room = this.room = new V.Room('OFFLINE', { botFill: 6, map: join.map });
     this.client = { sendRaw: (s) => queueMicrotask(() => onMessage(JSON.parse(s))) };
     room.join(this.client, join);
     this.timer = setInterval(() => room.tick(), V.TICK_MS);
@@ -668,6 +832,11 @@ function onMessage(m) {
         me.alive = true; me.hp = 100; me.sliding = false; me.dashCd = 0;
         me.ammo = WEAPONS.map((w) => w.mag); me.reserve = WEAPONS.map((w) => w.reserve); me.reloadUntil = 0;
         $('deathScreen').classList.add('hidden');
+        // Spawn-in: quick flash + weapon draw animation
+        me.switchUntil = performance.now() + 420;
+        const fl = $('vignette');
+        fl.animate([{ opacity: 1, background: 'radial-gradient(circle, rgba(0,240,255,0.0), rgba(0,240,255,0.55))' }, { opacity: 0 }], { duration: 600, easing: 'ease-out' });
+        if (playing) sound.tone('sine', 300, 900, 0.25, 0.2);
       } else {
         const a = avatars.get(m.id);
         if (a) { a.alive = true; a.hp = 100; a.flags = 0; a.teleport(m.x, m.y, m.z, m.yaw); }
@@ -1153,7 +1322,10 @@ function updateCamera(dt, now) {
   // Viewmodel
   const scoped = wp.scope && me.ads > 0.92;
   $('scope').style.opacity = scoped ? 1 : 0;
-  $('crosshair').style.opacity = me.ads > 0.6 ? 0 : 1;
+  const chOp = scoped || !me.alive ? '0' : '1';
+  if (hudCache.chOp !== chOp) { hudCache.chOp = chOp; $('crosshair').style.opacity = chOp; }
+  const firingNow = now - me.lastShot < 90;
+  if (hudCache.chFire !== firingNow) { hudCache.chFire = firingNow; $('crosshair').classList.toggle('firing', firingNow); }
   vmGuns.forEach((g, i) => (g.visible = i === me.w && me.alive && !scoped));
   const g = vmGuns[me.w];
   if (!g) return;
@@ -1245,13 +1417,14 @@ function updateHud(now) {
   // Dynamic crosshair spread
   const wp = curWeapon();
   const hs = Math.hypot(me.vel.x, me.vel.z);
-  const sp = (wp.spread + (hs / PLAYER.run) * 0.012 + (me.phys.onGround ? 0 : 0.025)) * 260 + 4 + me.recoil * 120;
+  const sp = (lerp(wp.spread, wp.adsSpread, me.ads) + (hs / PLAYER.run) * 0.012 + (me.phys.onGround ? 0 : 0.025)) * 260 + 4 + me.recoil * 120;
   const gap = Math.round(clamp(sp, 4, 40));
   if (hudCache.gap !== gap) {
     hudCache.gap = gap;
     const ch = $('crosshair').children;
-    ch[1].style.top = `${-gap - 8}px`; ch[2].style.top = `${gap}px`;
-    ch[3].style.left = `${-gap - 8}px`; ch[4].style.left = `${gap}px`;
+    ch[1].style.top = `${-gap - 9}px`; ch[2].style.top = `${gap}px`;
+    ch[3].style.left = `${-gap - 9}px`; ch[4].style.left = `${gap}px`;
+    const rr = gap + 9; ch[5].style.width = ch[5].style.height = `${rr * 2}px`; ch[5].style.left = ch[5].style.top = `${-rr}px`;
   }
 }
 function updateNetInfo(fps) {
@@ -1425,6 +1598,7 @@ function frame() {
   const t = now / 1000;
   for (const p of padMeshes) { const k = (t * 1.5 + p.position.x * 0.1) % 1; p.ring.position.y = 0.2 + k * 1.6; p.ring.material.opacity = 0.8 * (1 - k); p.ring.scale.setScalar(1 - k * 0.3); }
   for (const g of pickupMeshes) { if (!g.on) continue; g.gem.rotation.y = t * 2; g.gem.position.y = 1 + Math.sin(t * 2.5 + g.idx) * 0.15; g.halo.position.y = g.gem.position.y; }
+  for (const f of decoAnim) f(dt, t);
   updateEffects(dt);
   updateDmgNumbers(dt);
   updateHud(now);
@@ -1443,6 +1617,9 @@ function buildSettingsUI(container) {
     <span>Sensitivity</span><input type="range" min="0.1" max="4" step="0.05" data-k="sens"><span data-v="sens"></span>
     <span>Field of view</span><input type="range" min="70" max="120" step="1" data-k="fov"><span data-v="fov"></span>
     <span>Volume</span><input type="range" min="0" max="1" step="0.05" data-k="volume"><span data-v="volume"></span>
+    <span>Crosshair</span><select data-k="chStyle"><option value="crossdot">Cross + dot</option><option value="cross">Cross</option><option value="dot">Dot</option><option value="circle">Circle + dot</option><option value="tstyle">T-shape</option></select><span></span>
+    <span>Crosshair color</span><select data-k="chColor"><option value="#00f0ff">Cyan</option><option value="#ffffff">White</option><option value="#39ff14">Green</option><option value="#ffe600">Yellow</option><option value="#ff0055">Red</option><option value="#ff2bd6">Pink</option></select><span></span>
+    <span>Crosshair size</span><input type="range" min="0.6" max="2.2" step="0.1" data-k="chSize"><span data-v="chSize"></span>
     <span>Quality</span><select data-k="quality"><option value="auto">Auto</option><option value="low">Low (fastest)</option><option value="medium">Medium</option><option value="high">High</option></select><span></span>`;
   const sync = () => container.querySelectorAll('[data-k]').forEach((el) => {
     el.value = settings[el.dataset.k];
@@ -1451,7 +1628,8 @@ function buildSettingsUI(container) {
   });
   container.addEventListener('input', (e) => {
     const k = e.target.dataset.k; if (!k) return;
-    settings[k] = k === 'quality' ? e.target.value : +e.target.value;
+    settings[k] = (k === 'quality' || k === 'chStyle' || k === 'chColor') ? e.target.value : +e.target.value;
+    if (k.startsWith('ch')) applyCrosshair();
     if (k === 'volume') sound.setVolume(settings.volume);
     if (k === 'fov') resize();
     if (k === 'quality') { pixelRatio = basePixelRatio(); resize(); }
@@ -1461,6 +1639,13 @@ function buildSettingsUI(container) {
   container._sync = sync;
   sync();
 }
+function applyCrosshair() {
+  const ch = $('crosshair');
+  ch.className = 'st-' + settings.chStyle;
+  ch.style.setProperty('--ch', settings.chColor);
+  ch.style.setProperty('--chs', settings.chSize);
+}
+applyCrosshair();
 buildSettingsUI($('settingsGrid'));
 buildSettingsUI($('pauseSettings'));
 
@@ -1474,6 +1659,9 @@ Object.entries(SKINS).forEach(([k, s]) => {
 });
 $('nameInput').value = settings.name || 'Player' + Math.floor(Math.random() * 900 + 100);
 $('roomInput').value = settings.room || 'PUBLIC';
+$('practiceMap').innerHTML = '<option value="RANDOM">Random</option>' + V.MAP_ORDER.map((k) => `<option value="${k}">${V.MAP_DEFS[k].name}</option>`).join('');
+const qMap = new URLSearchParams(location.search).get('map');
+if (qMap && V.MAP_DEFS[qMap]) $('practiceMap').value = qMap;
 
 // Wake the (possibly sleeping) server while the player is still on the menu.
 let serverReady = false;
@@ -1509,7 +1697,8 @@ async function startGame(offline) {
   saveSettings();
   me.name = settings.name; me.skin = settings.skin;
   buildViewmodels(me.skin);
-  const join = { t: 'join', name: me.name, skin: me.skin, room: settings.room };
+  const pm = $('practiceMap').value;
+  const join = { t: 'join', name: me.name, skin: me.skin, room: settings.room, map: pm === 'RANDOM' ? null : pm };
   const btn = $('playBtn');
   $('menuError').textContent = '';
   btn.disabled = true; $('offlineBtn').disabled = true;

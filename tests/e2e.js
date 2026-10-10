@@ -32,8 +32,20 @@ const SHOTS = process.env.SHOTS_DIR;
 
   // Teleport Bravo in front of Alpha (client-authoritative movement) and have Alpha shoot.
   const bId = await b.evaluate(() => window.__veck.me.id);
-  await a.evaluate(() => { const m = window.__veck.me; m.pos.set(12, 0, 47); m.vel.set(0, 0, 0); m.yaw = 0; m.pitch = 0; });
-  await b.evaluate(() => { const m = window.__veck.me; m.pos.set(12, 0, 39); m.vel.set(0, 0, 0); });
+  // Find two open ground spots 8m apart with clear line of sight on whatever map is active.
+  const spot = await a.evaluate(() => {
+    const V = window.VECK, map = window.__veck.map;
+    for (let i = 0; i < 5000; i++) {
+      const x = (Math.random() * 2 - 1) * (map.H - 10), z = (Math.random() * 2 - 1) * (map.H - 10);
+      if (!V.isClear(map, x, z, 1) || !V.isClear(map, x, z - 8, 1)) continue;
+      if (V.rayMap(map, x, 1.6, z, 0, 0, -1, 8) < 8) continue;
+      return { x, z };
+    }
+    return null;
+  });
+  if (!spot) throw new Error('no clear spot found');
+  await a.evaluate((s) => { const m = window.__veck.me; m.pos.set(s.x, 0, s.z); m.vel.set(0, 0, 0); m.yaw = 0; m.pitch = 0; }, spot);
+  await b.evaluate((s) => { const m = window.__veck.me; m.pos.set(s.x, 0, s.z - 8); m.vel.set(0, 0, 0); }, spot);
   await a.waitForTimeout(1600);
   const hpBefore = await b.evaluate(() => window.__veck.me.hp);
   await a.evaluate(() => { const v = window.__veck; v.me.firing = false; });

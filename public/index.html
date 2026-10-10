@@ -81,11 +81,18 @@
     /* ───── HUD ───── */
     #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
     .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); }
-    #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
-    #crosshair i { position: absolute; background: #fff; box-shadow: 0 0 3px rgba(0,0,0,0.9); }
-    #crosshair .c-dot { width: 3px; height: 3px; left: -1.5px; top: -1.5px; border-radius: 50%; background: var(--cyan); }
-    #crosshair .c-t, #crosshair .c-b { width: 2px; height: 8px; left: -1px; }
-    #crosshair .c-l, #crosshair .c-r { width: 8px; height: 2px; top: -1px; }
+    #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --ch: #ffffff; transform: scale(var(--chs, 1)); z-index: 5; }
+    #crosshair i { position: absolute; background: var(--ch); box-shadow: 0 0 0 1px rgba(0,0,0,0.85), 0 0 4px rgba(0,0,0,0.6); }
+    #crosshair .c-dot { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; }
+    #crosshair .c-t, #crosshair .c-b { width: 2px; height: 9px; left: -1px; }
+    #crosshair .c-l, #crosshair .c-r { width: 9px; height: 2px; top: -1px; }
+    #crosshair .c-ring { width: 26px; height: 26px; left: -13px; top: -13px; border-radius: 50%; background: transparent; border: 2px solid var(--ch); box-shadow: 0 0 0 1px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.6); display: none; }
+    #crosshair.st-dot .c-t, #crosshair.st-dot .c-b, #crosshair.st-dot .c-l, #crosshair.st-dot .c-r { display: none; }
+    #crosshair.st-cross .c-dot { display: none; }
+    #crosshair.st-circle .c-t, #crosshair.st-circle .c-b, #crosshair.st-circle .c-l, #crosshair.st-circle .c-r { display: none; }
+    #crosshair.st-circle .c-ring { display: block; }
+    #crosshair.st-tstyle .c-t { display: none; }
+    #crosshair.firing i { filter: brightness(1.4); }
     #hitmarker { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; opacity: 0; transform: rotate(45deg); }
     #hitmarker i { position: absolute; background: #fff; }
     #hitmarker i:nth-child(1) { left: 14px; top: 0; width: 2px; height: 9px; } #hitmarker i:nth-child(2) { left: 14px; bottom: 0; width: 2px; height: 9px; }
@@ -192,22 +199,35 @@
     .is-touch #status { top: 142px; }
     .is-touch #chat { bottom: 170px; }
     .is-touch .controls { display: none; }
-    #joy { position: absolute; left: 18px; bottom: 18px; width: 130px; height: 130px; border-radius: 50%; background: rgba(10, 14, 34, 0.35); border: 2px solid rgba(0,240,255,0.35); pointer-events: auto; touch-action: none; }
-    #joyKnob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #7ff8ff, #0090b0); box-shadow: 0 0 14px rgba(0,240,255,0.6); }
-    #aimZone { position: absolute; right: 0; top: 0; width: 62%; height: 100%; pointer-events: auto; touch-action: none; }
-    .tb { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 10px; letter-spacing: 1px; color: #fff; background: rgba(10, 14, 34, 0.55); border: 2px solid rgba(255,255,255,0.25); }
-    .tb.down { filter: brightness(1.6); transform: scale(0.93); }
-    #tFire { right: 26px; bottom: 34px; width: 84px; height: 84px; background: rgba(255, 0, 85, 0.45); border-color: rgba(255, 0, 85, 0.9); font-size: 12px; }
-    #tFire2 { left: 170px; bottom: 110px; width: 58px; height: 58px; background: rgba(255, 0, 85, 0.35); border-color: rgba(255, 0, 85, 0.7); }
-    #tJump { right: 124px; bottom: 26px; width: 60px; height: 60px; border-color: var(--cyan); }
-    #tAds { right: 40px; bottom: 136px; width: 54px; height: 54px; border-color: var(--yellow); }
-    #tSlide { right: 196px; bottom: 26px; width: 52px; height: 52px; }
-    #tReload { right: 112px; bottom: 104px; width: 46px; height: 46px; }
-    #tDash { right: 182px; bottom: 92px; width: 46px; height: 46px; border-color: var(--green); }
-    #tSwap { right: 18px; top: 92px; width: 50px; height: 50px; border-radius: 12px; }
-    #tMenu { right: 18px; top: 150px; width: 50px; height: 34px; border-radius: 10px; font-size: 9px; }
-    #tBoard { right: 74px; top: 150px; width: 40px; height: 34px; border-radius: 10px; }
-    .is-touch #killfeed { right: 84px; top: 34px; }
+    /* Touch layout: joystick bottom-left, FIRE bottom-right with action buttons in an arc around it,
+       small utility buttons in a row at the top-right. All offsets respect phone safe areas. */
+    #touch { --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); --sb: env(safe-area-inset-bottom, 0px); }
+    #joy { position: absolute; left: calc(22px + var(--sl)); bottom: calc(22px + var(--sb)); width: 128px; height: 128px; border-radius: 50%; background: radial-gradient(circle, rgba(0,240,255,0.08), rgba(10,14,34,0.35) 70%); border: 2px solid rgba(0,240,255,0.35); pointer-events: auto; touch-action: none; }
+    #joyKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #7ff8ff, #0090b0); box-shadow: 0 0 14px rgba(0,240,255,0.6); }
+    #aimZone { position: absolute; right: 0; top: 0; width: 60%; height: 100%; pointer-events: auto; touch-action: none; }
+    .tb { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      width: 54px; height: 54px; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 9px; letter-spacing: .5px; color: #fff;
+      background: rgba(10, 14, 34, 0.5); border: 2px solid rgba(255,255,255,0.28); backdrop-filter: blur(3px); transition: transform .06s; }
+    .tb.down { filter: brightness(1.6); transform: scale(0.92); }
+    /* FIRE: anchor of the arc */
+    #tFire { right: calc(26px + var(--sr)); bottom: calc(26px + var(--sb)); width: 92px; height: 92px; font-size: 13px; background: rgba(255,0,85,0.42); border: 3px solid rgba(255,0,85,0.95); box-shadow: 0 0 22px rgba(255,0,85,0.35); }
+    /* Arc around FIRE (radius ~110px) */
+    #tJump   { right: calc(140px + var(--sr)); bottom: calc(28px + var(--sb));  width: 62px; height: 62px; border-color: var(--cyan); font-size: 10px; }
+    #tSlide  { right: calc(128px + var(--sr)); bottom: calc(104px + var(--sb)); border-color: rgba(255,255,255,0.45); }
+    #tAds    { right: calc(70px + var(--sr));  bottom: calc(146px + var(--sb)); border-color: var(--yellow); }
+    #tReload { right: calc(16px + var(--sr));  bottom: calc(136px + var(--sb)); width: 46px; height: 46px; font-size: 18px; }
+    #tDash   { right: calc(212px + var(--sr)); bottom: calc(40px + var(--sb));  width: 50px; height: 50px; border-color: var(--green); }
+    /* Second fire button above the joystick for left thumb */
+    #tFire2 { left: calc(164px + var(--sl)); bottom: calc(96px + var(--sb)); width: 58px; height: 58px; background: rgba(255,0,85,0.3); border-color: rgba(255,0,85,0.75); }
+    /* Utility row top-right */
+    #tSwap, #tBoard, #tMenu { top: 64px; width: 46px; height: 38px; border-radius: 12px; font-size: 9px; }
+    #tSwap  { right: calc(12px + var(--sr)); width: 60px; border-color: var(--cyan); font-size: 14px; }
+    #tBoard { right: calc(80px + var(--sr)); font-size: 14px; }
+    #tMenu  { right: calc(134px + var(--sr)); }
+    .is-touch #killfeed { right: auto; left: 50%; transform: translateX(-50%); top: 96px; align-items: center; }
+    .is-touch #killfeed .kf:nth-last-child(n+4) { display: none; }
+    .is-touch .tiny, .is-touch #dashBar { display: none; }
+    .is-touch .bar.thin { display: none; }
     .is-touch .kf { font-size: 10px; padding: 3px 8px; }
     @media (max-height: 520px) {
       #menu { justify-content: flex-start; }
@@ -220,7 +240,14 @@
     }
     @media (max-height: 420px) {
       .is-touch #minimapWrap { width: 90px; height: 90px; } .is-touch #mapName { display: none; } .is-touch #status { top: 108px; }
-      #tFire { width: 72px; height: 72px; }
+      #joy { width: 110px; height: 110px; bottom: calc(14px + var(--sb)); }
+      #tFire { width: 80px; height: 80px; right: calc(20px + var(--sr)); bottom: calc(18px + var(--sb)); }
+      #tJump { right: calc(122px + var(--sr)); bottom: calc(18px + var(--sb)); width: 56px; height: 56px; }
+      #tSlide { right: calc(112px + var(--sr)); bottom: calc(86px + var(--sb)); width: 48px; height: 48px; }
+      #tAds { right: calc(60px + var(--sr)); bottom: calc(122px + var(--sb)); width: 48px; height: 48px; }
+      #tReload { right: calc(12px + var(--sr)); bottom: calc(112px + var(--sb)); width: 42px; height: 42px; }
+      #tDash { right: calc(186px + var(--sr)); bottom: calc(26px + var(--sb)); width: 46px; height: 46px; }
+      #tFire2 { bottom: calc(80px + var(--sb)); left: calc(138px + var(--sl)); width: 52px; height: 52px; }
     }
   </style>
 </head>
@@ -261,6 +288,10 @@
       <div class="row" style="margin-top:10px">
         <button class="btn secondary" id="offlineBtn">PRACTICE VS BOTS (OFFLINE)</button>
       </div>
+      <div class="field" style="margin:10px 0 0">
+        <label for="practiceMap">PRACTICE MAP</label>
+        <select id="practiceMap" style="width:100%;padding:9px;border-radius:10px;background:rgba(4,8,22,0.9);color:var(--cyan);border:1px solid rgba(0,240,255,0.25);font-family:'JetBrains Mono',monospace;font-weight:800"></select>
+      </div>
       <div id="serverStatus"><span class="dot"></span><span id="serverText">Checking game server…</span></div>
       <div id="menuError"></div>
       <details class="settings">
@@ -280,7 +311,7 @@
     <div id="scope"></div>
     <div id="vignette"></div>
     <div id="dmgDir"></div>
-    <div id="crosshair"><i class="c-dot"></i><i class="c-t"></i><i class="c-b"></i><i class="c-l"></i><i class="c-r"></i></div>
+    <div id="crosshair"><i class="c-dot"></i><i class="c-t"></i><i class="c-b"></i><i class="c-l"></i><i class="c-r"></i><i class="c-ring"></i></div>
     <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
     <div id="dmgNums"></div>
 
@@ -324,9 +355,9 @@
       <div class="tb" id="tJump">JUMP</div>
       <div class="tb" id="tAds">AIM</div>
       <div class="tb" id="tSlide">SLIDE</div>
-      <div class="tb" id="tReload">R</div>
+      <div class="tb" id="tReload">⟳</div>
       <div class="tb" id="tDash">DASH</div>
-      <div class="tb" id="tSwap">⇄</div>
+      <div class="tb" id="tSwap">⇄ GUN</div>
       <div class="tb" id="tMenu">MENU</div>
       <div class="tb" id="tBoard">☰</div>
     </div>

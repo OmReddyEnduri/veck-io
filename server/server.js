@@ -21,7 +21,7 @@ function findRoom(code) {
     if (code !== 'PUBLIC') return null;
     name = `${code}-${++n}`;
   }
-  if (!rooms.has(name)) rooms.set(name, new Room(name, { maxPlayers: MAX_ROOM_PLAYERS, botFill: 4 }));
+  if (!rooms.has(name)) rooms.set(name, new Room(name, { maxPlayers: MAX_ROOM_PLAYERS, botFill: 0 })); // online: real players only, no bots
   return rooms.get(name);
 }
 
