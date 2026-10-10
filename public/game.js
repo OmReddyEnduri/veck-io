@@ -993,21 +993,30 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; me.firing = false; });
 
 const locked = () => document.pointerLockElement === canvas;
-canvas.addEventListener('click', () => { if (playing && !IS_TOUCH && !locked()) lockPointer(); });
+document.addEventListener('mousedown', (e) => { if (playing && !IS_TOUCH && !locked() && !chatOpen && $('pauseScreen').classList.contains('hidden') && e.target === canvas) lockPointer(); });
+// Plain pointer lock (no unadjustedMovement: some systems reject it). Must run inside a click/key handler.
 function lockPointer() {
-  try { const p = canvas.requestPointerLock({ unadjustedMovement: true }); if (p && p.catch) p.catch(() => canvas.requestPointerLock()); } catch { canvas.requestPointerLock(); }
+  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => needClick()); } catch { needClick(); }
 }
+// Lock failed or was lost: show the overlay so one click brings the mouse back.
+function needClick() {
+  if (!playing || IS_TOUCH || locked() || chatOpen) return;
+  paused = true; me.firing = false; me.wantAds = false;
+  $('pauseScreen').classList.remove('hidden');
+}
+document.addEventListener('pointerlockerror', needClick);
 document.addEventListener('pointerlockchange', () => {
   if (!playing || IS_TOUCH) return;
   if (locked()) { paused = false; $('pauseScreen').classList.add('hidden'); }
-  else if (!chatOpen) { paused = true; me.firing = false; me.wantAds = false; $('pauseScreen').classList.remove('hidden'); }
+  else needClick();
 });
 document.addEventListener('mousemove', (e) => {
   if (!locked()) return;
   const adsScale = me.ads > 0 ? lerp(1, curVFov() / baseVFov, 0.9) : 1;
   const s = 0.0022 * settings.sens * adsScale;
-  me.yaw -= e.movementX * s;
-  me.pitch = clamp(me.pitch - e.movementY * s, -1.55, 1.55);
+  const mx = clamp(e.movementX, -400, 400), my = clamp(e.movementY, -400, 400); // ignore browser spike glitches
+  me.yaw -= mx * s;
+  me.pitch = clamp(me.pitch - my * s, -1.55, 1.55);
   vmSway.x += e.movementX * 0.00012; vmSway.y += e.movementY * 0.00012;
 });
 document.addEventListener('mousedown', (e) => {
@@ -1697,6 +1706,7 @@ async function startGame(offline) {
   saveSettings();
   me.name = settings.name; me.skin = settings.skin;
   buildViewmodels(me.skin);
+  if (!IS_TOUCH) lockPointer(); // must happen during the click, before any await
   const pm = $('practiceMap').value;
   const join = { t: 'join', name: me.name, skin: me.skin, room: settings.room, map: pm === 'RANDOM' ? null : pm };
   const btn = $('playBtn');
@@ -1710,10 +1720,11 @@ async function startGame(offline) {
   } catch (e) {
     btn.disabled = false; $('offlineBtn').disabled = false; btn.textContent = 'PLAY ONLINE';
     $('menuError').textContent = 'Could not reach the game server. Try again in a few seconds, or play offline.';
+    if (document.pointerLockElement) document.exitPointerLock();
     return;
   }
   btn.textContent = 'PLAY ONLINE';
-  if (!IS_TOUCH) lockPointer();
+  if (!IS_TOUCH && !locked()) setTimeout(needClick, 400);
   else { try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch {} }
 }
 function startPlaying() {
