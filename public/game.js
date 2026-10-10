@@ -970,6 +970,9 @@ function setPickup(i, on) {
 // ═════════════ INPUT ═════════════
 const keys = {};
 const joy = { x: 0, y: 0 };
+// Right-hand keys fire the weapon (handy on laptops/touchpads). Hold for automatic fire.
+const FIRE_KEYS = new Set(['KeyU', 'KeyI', 'KeyO', 'KeyP', 'KeyH', 'KeyJ', 'KeyK', 'KeyL', 'KeyN', 'KeyM', 'Semicolon', 'Quote', 'Comma', 'Period', 'Slash', 'BracketLeft', 'BracketRight', 'Backslash']);
+const fireKeysDown = new Set();
 window.addEventListener('keydown', (e) => {
   if (!playing) return;
   if (chatOpen) {
@@ -979,6 +982,11 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.code === 'Tab') { e.preventDefault(); $('scoreboard').classList.remove('hidden'); renderScoreboard(); return; }
   if (e.code === 'Enter' || e.code === 'KeyT') { e.preventDefault(); openChat(); return; }
+  if (FIRE_KEYS.has(e.code)) {
+    e.preventDefault();
+    if (!e.repeat) { fireKeysDown.add(e.code); me.firing = true; fire(); }
+    return;
+  }
   keys[e.code] = true;
   if (e.code === 'Space') { me.jumpBuf = 0.15; e.preventDefault(); }
   if (e.code === 'KeyR') reload();
@@ -988,9 +996,10 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
   keys[e.code] = false;
+  if (fireKeysDown.delete(e.code) && fireKeysDown.size === 0) me.firing = false;
   if (e.code === 'Tab') $('scoreboard').classList.add('hidden');
 });
-window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; me.firing = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; fireKeysDown.clear(); me.firing = false; });
 
 const locked = () => document.pointerLockElement === canvas;
 document.addEventListener('mousedown', (e) => { if (playing && !IS_TOUCH && !locked() && !chatOpen && $('pauseScreen').classList.contains('hidden') && e.target === canvas) lockPointer(); });
