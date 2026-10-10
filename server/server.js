@@ -4,7 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
-const { sanitizeRoom } = require('../public/shared.js');
+const { sanitizeRoom, MAP_ORDER } = require('../public/shared.js');
 const { Room, TICK_MS } = require('../public/room.js');
 
 const PORT = process.env.PORT || 5000;
@@ -14,14 +14,15 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 const rooms = new Map();
 
-function findRoom(code) {
+function findRoom(code, map) {
   // Public matchmaking spills over into PUBLIC-2, PUBLIC-3... when full.
   let name = code, n = 1;
   while (rooms.has(name) && rooms.get(name).isFull()) {
-    if (code !== 'PUBLIC') return null;
+    if (!code.startsWith('PUBLIC')) return null;
     name = `${code}-${++n}`;
   }
-  if (!rooms.has(name)) rooms.set(name, new Room(name, { maxPlayers: MAX_ROOM_PLAYERS, botFill: 0 })); // online: real players only, no bots
+  // Online: real players only, no bots. A chosen map is kept for the whole life of the room.
+  if (!rooms.has(name)) rooms.set(name, new Room(name, { maxPlayers: MAX_ROOM_PLAYERS, botFill: 0, map, lockMap: !!map }));
   return rooms.get(name);
 }
 
@@ -70,7 +71,11 @@ wss.on('connection', (ws, req) => {
     if (!msg || typeof msg !== 'object') return;
     if (msg.t === 'join') {
       if (client.room) return;
-      const room = findRoom(sanitizeRoom(msg.room));
+      const map = MAP_ORDER.includes(msg.map) ? msg.map : null;
+      let code = sanitizeRoom(msg.room);
+      // Public players who pick a map share a public room dedicated to that map.
+      if (code === 'PUBLIC' && map) code = 'PUBLIC-' + map;
+      const room = findRoom(code, map);
       if (!room) { client.sendRaw(JSON.stringify({ t: 'err', m: 'Room is full' })); return ws.close(); }
       client.room = room;
       room.join(client, msg);

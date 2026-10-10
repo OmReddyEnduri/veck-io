@@ -28,6 +28,7 @@
       this.players = new Map();       // id -> player
       this.nextId = 1;
       this.mapIdx = opts.map && MAP_ORDER.includes(opts.map) ? MAP_ORDER.indexOf(opts.map) : Math.floor(Math.random() * MAP_ORDER.length);
+      this.lockMap = !!(opts.map && MAP_ORDER.includes(opts.map) && opts.lockMap);
       this.state = 'play';
       this.startMatch(true);
     }
@@ -64,7 +65,7 @@
     endMatch() {
       this.state = 'end';
       this.nextStartAt = now() + INTERMISSION_MS;
-      this.mapIdx++;
+      if (!this.lockMap) this.mapIdx++;
       const board = [...this.players.values()]
         .sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)
         .map((p) => ({ id: p.id, name: p.name, kills: p.kills, deaths: p.deaths, bot: p.bot }));
