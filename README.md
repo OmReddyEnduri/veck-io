@@ -1,89 +1,52 @@
-# ⚡ VECK.IO — 1v1 Cyberpunk 3D Mega-Arena FPS
+# ⚡ VECK.IO — Multiplayer Arena FPS
 
-An arcade 1v1 Cyberpunk 3D Arena First-Person Shooter built with **Three.js**, **Web Audio API**, and vanilla JavaScript. Inspired by *Krunker.io*, *Venge.io*, *Quake Champions*, and *Valorant*.
+A fast, Veck.io-style browser shooter: **Three.js** client on **Vercel**, authoritative **WebSocket** game server on **Render**.
 
-![VECK.IO Preview](https://img.shields.io/badge/Status-Live-00f0ff?style=for-the-badge) ![Tech](https://img.shields.io/badge/Engine-Three.js_r128-ff0055?style=for-the-badge) ![Audio](https://img.shields.io/badge/Audio-Web_Audio_API-ffe600?style=for-the-badge)
+## Features
+- Free-for-all deathmatch: first to 30 kills or 6 minutes, then a scoreboard and map rotation
+- 9 maps, each with its own look: Squid Playground, Downtown Sprawl, Frozen Depot, Sky Gardens (low gravity), Desert Ruins, Neon Metropolis, Orbital Apex (low gravity), Volcanic Core, Cyber Matrix
+- 4 weapons: Pulse Rifle, Spectre SMG, Breacher Shotgun, Ion Sniper (with a scope); headshots and damage falloff
+- Movement: sprint, jump (with coyote time and a jump buffer), slide, dash, air control
+- Weapon animations: magazine drop and insert, bolt and pump cycling, ejected shell casings, recoil, sway and bob, a draw animation
+- Online rooms are real players only; bots appear only in offline practice (with a map picker)
+- Random spawn points anywhere on the map, away from other players
+- Customizable crosshair (style, color, size)
+- Public quick play or private room codes, in-game chat, killfeed, killstreaks, minimap radar, Tab scoreboard
+- Mobile touch controls (joystick, swipe to aim, action buttons)
 
----
+## Low-latency netcode
+- One persistent WebSocket per player with compression and Nagle disabled; the server sends snapshots 30 times a second.
+- **Client-side prediction:** your own movement is simulated locally and never waits for the server.
+- **Interpolation buffer:** other players are rendered slightly in the past. The buffer size adapts to network jitter, and missing packets are briefly extrapolated, so other players move smoothly.
+- **Favor-the-shooter hits:** shots are checked against what you see. The server confirms each hit using recent position history and a line-of-sight check, then applies damage (health, kills and respawns are decided by the server).
+- Rendering cost is kept low: instanced map geometry, no dynamic lights, pooled effects, and an adaptive resolution when FPS drops.
 
-## 🎮 Key Features
+## Run locally
+```bash
+npm install
+npm start            # http://localhost:5000 — the server also hosts the client
+```
+Tests (with the server running):
+```bash
+node tests/sim.test.js ws://localhost:5000   # latency + tick rate
+node tests/e2e.js http://localhost:5000      # two real browsers join, shoot, take damage
+```
 
-- **⚔️ 1v1 Apex Rival Boss Duel:** Face off against `NEXUS-01`, a tactical AI rival soldier equipped with a 3D Heavy Laser Cannon, running animations, and obstacle-aware line-of-sight targeting.
-- **⚡ Tactical Movement & Physics:**
-  - `Shift` + `C` or `Control` **Sliding Mechanics** with dynamic ground-level lowering (`1.6m`) and slide whoosh audio.
-  - High-velocity **Jump Pads** for aerial repositioning.
-  - Smooth AABB **Wall & Obstacle Collision Sliding System** — zero getting stuck against geometry.
-- **💥 Combat Juice & Weapon Feel:**
-  - **4 Unique Weapons:** Pulse Rifle (Full-Auto), Cyber Shotgun, Ion Sniper (ADS Scope), and Quantum Railgun.
-  - **Weapon Skins:** `CYBER` (Cyan), `GOLD` (Dragon Gold), `VOID` (Obsidian Purple), `PLASMA` (Neon Pink).
-  - **Aim Down Sights (ADS):** Right-click for zoom FOV, tight bullet spread, and precision sniper reticles.
-  - **2.5x Headshot Multiplier:** Precision hits to helmet trigger golden/red `CRIT` popups and audio chimes.
-  - **Visual Effects:** 3D brass shell casings ejection, procedural screen trauma/shake, neon bullet tracer beams, spark impacts.
-- **✨ 3D Floating Power-Up Pickups:**
-  - **Nano-Shield Overcharge** (Cyan Octahedron)
-  - **Max Ammo Restock** (Gold Octahedron)
-  - **Bio-Nanite Restore** (Emerald Octahedron)
-  - Featuring rotating 3D geometry, neon energy halos, and a 15-second respawn cycle.
-- **🗺️ Multi-Sector Mega-Arenas (260×260 units):**
-  - **NEON METROPOLIS:** High-contrast neon city arena with perimeter bunkers and sniper towers.
-  - **ORBITAL APEX:** Low-gravity space station with purple aurora lighting and amplified jump mechanics.
-  - **VOLCANIC CORE:** High-heat magma battleground with ember point lighting.
-- **📊 Tactical HUD & Scoreboard:**
-  - `TAB` **Match Scoreboard** tracking Score, Kills, Deaths, Total Damage, and Accuracy %.
-  - **Directional Damage Arcs:** Visual HUD indicators displaying exact incoming attack vectors.
-  - **Minimap Radar:** Real-time top-down tactical tracking of player, rival, and powerup locations.
-  - **Boss Health Bar:** Persistent top-center duel tracker.
+## Deploy
+- **Server (Render):** `render.yaml` blueprint, or a Node web service with build `npm install --omit=dev`, start `node server/server.js`, and health check `/health`.
+- **Client (Vercel):** static deploy of `public/` (see `vercel.json`). Set the server URL in `public/config.js`, or override it per visit with `?server=wss://…`.
 
----
+Free Render instances sleep after about 15 minutes idle. The menu wakes the server up as soon as the page loads, and offline practice works while it starts.
 
-## 🕹️ Controls
-
+## Controls
 | Key | Action |
-| :--- | :--- |
-| `W`, `A`, `S`, `D` | Move / Strafe |
-| `Shift` + `C` / `Ctrl` | Slide |
-| `Space` | Jump |
-| `Hold Left-Click` | Fire Weapon (Full-Auto for Rifle) |
-| `Right-Click` | Aim Down Sights (ADS) / Sniper Scope |
-| `1` - `4` | Select Weapon (Rifle, Shotgun, Sniper, Railgun) |
-| `R` | Reload Weapon |
-| `Tab` | View Match Scoreboard |
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (v16+)
-
-### Run Locally
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/OmReddyEnduri/veck-io.git
-   cd veck-io
-   ```
-
-2. Start the local server:
-   ```bash
-   node server.js
-   ```
-
-3. Open your browser and navigate to:
-   ```
-   http://localhost:5000
-   ```
-
----
-
-## 🛠️ Tech Stack
-- **Graphics Engine:** Three.js (r128)
-- **Audio Synthesis:** Web Audio API (Synthesized procedurally without external audio assets)
-- **Typography:** Google Fonts (Orbitron, Rajdhani, JetBrains Mono)
-- **Backend / Static Host:** Node.js HTTP Server
-- **QA Automation:** Playwright (Chromium)
-
----
-
-## 📜 License
-MIT License. Free to use, modify, and build upon.
+| --- | --- |
+| WASD | Move |
+| Space | Jump |
+| C / Ctrl | Slide (while running) |
+| Shift / Q | Dash |
+| Left click / Right click | Fire / Aim |
+| 1–4, mouse wheel | Weapons |
+| R | Reload |
+| Tab | Scoreboard |
+| Enter | Chat |

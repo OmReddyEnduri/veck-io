@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#060814">
+  <meta name="description" content="VECK.IO — fast multiplayer cyberpunk arena FPS in your browser.">
+  <title>VECK.IO — Multiplayer Arena FPS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="modulepreload" href="vendor/three.module.min.js">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@600;700&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 4l12 24L28 4h-6l-6 13L10 4z' fill='%2300f0ff'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --cyan: #00f0ff; --pink: #ff0055; --yellow: #ffe600; --green: #00ff88;
+      --panel: rgba(10, 14, 34, 0.86); --line: rgba(0, 240, 255, 0.35); --text: #e8f4ff; --muted: #8ea4c8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #060814; color: var(--text); font-family: 'Rajdhani', system-ui, sans-serif; position: fixed; inset: 0; }
+    canvas#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+    .hidden { display: none !important; }
+    button { font-family: inherit; }
+
+    /* ───── MENU ───── */
+    #menu {
+      position: absolute; inset: 0; z-index: 100; overflow-y: auto;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px 16px;
+      background: radial-gradient(ellipse at 50% 30%, rgba(30, 20, 80, 0.75), rgba(4, 6, 16, 0.96) 70%);
+    }
+    .logo {
+      font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(44px, 11vw, 92px); letter-spacing: 6px; line-height: 1;
+      background: linear-gradient(120deg, var(--cyan), #7a5cff 45%, var(--pink) 80%);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 28px rgba(0, 240, 255, 0.45));
+    }
+    .tagline { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 5px; color: var(--cyan); margin: 6px 0 22px; text-align: center; opacity: 0.85; }
+    .menu-card {
+      width: 100%; max-width: 520px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.03); backdrop-filter: blur(12px);
+    }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 2px; color: var(--muted); margin-bottom: 6px; }
+    .field input[type=text] {
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(0,240,255,0.25); outline: none;
+      background: rgba(4, 8, 22, 0.9); color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800;
+      -webkit-user-select: text; user-select: text;
+    }
+    .field input[type=text]:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,240,255,0.15); }
+    .skins { display: flex; gap: 8px; flex-wrap: wrap; }
+    .skin { width: 38px; height: 38px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; box-shadow: inset 0 0 0 3px rgba(0,0,0,0.45); transition: transform .12s; }
+    .skin:hover { transform: translateY(-2px); }
+    .skin.active { border-color: #fff; box-shadow: 0 0 16px currentColor, inset 0 0 0 3px rgba(0,0,0,0.45); }
+    .btn {
+      width: 100%; padding: 15px; border: none; border-radius: 12px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-weight: 900;
+      font-size: 17px; letter-spacing: 3px; color: #04060f; background: linear-gradient(120deg, var(--cyan), #7a5cff 60%, var(--pink));
+      box-shadow: 0 8px 30px rgba(0, 240, 255, 0.35); transition: transform .1s, filter .1s;
+    }
+    .btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { filter: grayscale(0.7) brightness(0.7); cursor: wait; }
+    .btn.secondary { background: rgba(255,255,255,0.06); color: var(--text); border: 1px solid rgba(255,255,255,0.15); box-shadow: none; font-size: 13px; padding: 12px; }
+    .row { display: flex; gap: 10px; }
+    .row > * { flex: 1; }
+    #serverStatus { margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-align: center; min-height: 16px; }
+    #serverStatus .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #888; vertical-align: middle; }
+    #serverStatus.ok .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    #serverStatus.wait .dot { background: var(--yellow); animation: blink 1s infinite; }
+    #serverStatus.bad .dot { background: var(--pink); }
+    @keyframes blink { 50% { opacity: .3; } }
+    #menuError { margin-top: 10px; color: #ff6b9a; font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: center; min-height: 0; }
+    .controls { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); max-width: 560px; }
+    kbd { background: rgba(0,240,255,0.12); border: 1px solid rgba(0,240,255,0.35); border-radius: 5px; padding: 1px 5px; color: var(--cyan); font-family: inherit; }
+    details.settings { margin-top: 12px; }
+    details.settings summary { cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 2px; color: var(--muted); list-style: none; text-align: center; }
+    details.settings summary::-webkit-details-marker { display: none; }
+    .set-grid { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 10px; align-items: center; margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+    .set-grid input[type=range] { width: 100%; accent-color: var(--cyan); }
+    .set-grid select { background: #0a1028; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px; font-family: inherit; }
+
+    /* ───── HUD ───── */
+    #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(6px); }
+    #crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --ch: #ffffff; transform: scale(var(--chs, 1)); z-index: 5; }
+    #crosshair i { position: absolute; background: var(--ch); box-shadow: 0 0 0 1px rgba(0,0,0,0.85), 0 0 4px rgba(0,0,0,0.6); }
+    #crosshair .c-dot { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; }
+    #crosshair .c-t, #crosshair .c-b { width: 2px; height: 9px; left: -1px; }
+    #crosshair .c-l, #crosshair .c-r { width: 9px; height: 2px; top: -1px; }
+    #crosshair .c-ring { width: 26px; height: 26px; left: -13px; top: -13px; border-radius: 50%; background: transparent; border: 2px solid var(--ch); box-shadow: 0 0 0 1px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.6); display: none; }
+    #crosshair.st-dot .c-t, #crosshair.st-dot .c-b, #crosshair.st-dot .c-l, #crosshair.st-dot .c-r { display: none; }
+    #crosshair.st-cross .c-dot { display: none; }
+    #crosshair.st-circle .c-t, #crosshair.st-circle .c-b, #crosshair.st-circle .c-l, #crosshair.st-circle .c-r { display: none; }
+    #crosshair.st-circle .c-ring { display: block; }
+    #crosshair.st-tstyle .c-t { display: none; }
+    #crosshair.firing i { filter: brightness(1.4); }
+    #hitmarker { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; opacity: 0; transform: rotate(45deg); }
+    #hitmarker i { position: absolute; background: #fff; }
+    #hitmarker i:nth-child(1) { left: 14px; top: 0; width: 2px; height: 9px; } #hitmarker i:nth-child(2) { left: 14px; bottom: 0; width: 2px; height: 9px; }
+    #hitmarker i:nth-child(3) { top: 14px; left: 0; width: 9px; height: 2px; } #hitmarker i:nth-child(4) { top: 14px; right: 0; width: 9px; height: 2px; }
+    #hitmarker.head i { background: var(--yellow); box-shadow: 0 0 6px var(--pink); }
+    #hitmarker.kill i { background: var(--pink); box-shadow: 0 0 8px var(--pink); }
+    #scope { position: absolute; inset: 0; opacity: 0; background: radial-gradient(circle at center, transparent 0, transparent min(34vh, 34vw), rgba(0,0,0,0.92) calc(min(34vh, 34vw) + 2px)); }
+    #scope::before, #scope::after { content: ''; position: absolute; background: rgba(0,0,0,0.85); }
+    #scope::before { left: 0; right: 0; top: 50%; height: 1px; }
+    #scope::after { top: 0; bottom: 0; left: 50%; width: 1px; }
+    #vignette { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 0, 40, 0.55)); transition: opacity .25s; }
+    #dmgDir { position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; margin: -110px 0 0 -110px; opacity: 0; transition: opacity .5s; }
+    #dmgDir::before { content: ''; position: absolute; inset: 0; border-radius: 50%; border: 5px solid transparent; border-top-color: var(--pink); filter: drop-shadow(0 0 8px var(--pink)); }
+
+    #topbar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: stretch; }
+    #topbar .panel { padding: 6px 14px; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+    #timer { color: #fff; min-width: 74px; justify-content: center; }
+    #lead { color: var(--yellow); font-size: 12px !important; }
+    #myScore { color: var(--cyan); font-size: 12px !important; }
+    #netinfo { position: absolute; top: 10px; right: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-align: right; text-shadow: 0 1px 2px #000; }
+    #netinfo b { color: var(--green); }
+    #netinfo b.warn { color: var(--yellow); } #netinfo b.bad { color: var(--pink); }
+
+    #minimapWrap { position: absolute; top: 12px; left: 12px; width: 140px; height: 140px; border-radius: 12px; overflow: hidden; }
+    #minimap { width: 100%; height: 100%; display: block; }
+    #mapName { position: absolute; top: 158px; left: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--cyan); letter-spacing: 1px; text-shadow: 0 1px 2px #000; }
+
+    #killfeed { position: absolute; top: 44px; right: 12px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+    .kf { background: rgba(8, 12, 30, 0.8); border-radius: 6px; padding: 4px 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800; animation: kfIn .18s ease-out; white-space: nowrap; }
+    .kf.me { border: 1px solid var(--cyan); }
+    .kf .w { color: var(--muted); margin: 0 6px; font-size: 10px; }
+    .kf .hs { color: var(--yellow); margin-left: 4px; }
+    .kf.sys { color: var(--muted); font-weight: 600; }
+    @keyframes kfIn { from { transform: translateX(20px); opacity: 0; } }
+
+    #chat { position: absolute; left: 12px; bottom: 150px; width: min(380px, 60vw); display: flex; flex-direction: column; gap: 3px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    #chat .line { background: rgba(4, 6, 16, 0.55); padding: 3px 8px; border-radius: 5px; text-shadow: 0 1px 1px #000; animation: kfIn .15s; overflow-wrap: anywhere; }
+    #chatInput { pointer-events: auto; width: min(380px, 60vw); padding: 7px 10px; background: rgba(4,8,22,0.92); color: #fff; border: 1px solid var(--cyan); border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; -webkit-user-select: text; user-select: text; position: absolute; left: 12px; bottom: 118px; }
+
+    #status { position: absolute; left: 16px; bottom: 16px; width: 260px; padding: 12px 14px; }
+    .hp-row { display: flex; align-items: baseline; gap: 10px; font-family: 'Orbitron', sans-serif; }
+    #hpNum { font-size: 34px; font-weight: 900; color: #fff; min-width: 70px; }
+    .hp-label { font-size: 10px; letter-spacing: 2px; color: var(--muted); }
+    .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; margin-top: 6px; }
+    .bar > i { display: block; height: 100%; width: 100%; transform-origin: left; transition: transform .12s ease-out; }
+    #hpBar { background: linear-gradient(90deg, var(--green), #8affc8); box-shadow: 0 0 10px var(--green); }
+    #hpBar.low { background: linear-gradient(90deg, var(--pink), #ff7aa5); }
+    #dashBar { background: var(--yellow); }
+    .bar.thin { height: 4px; }
+    .tiny { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 1px; color: var(--muted); margin-top: 6px; display: flex; justify-content: space-between; }
+
+    #weapon { position: absolute; right: 16px; bottom: 16px; padding: 12px 16px; text-align: right; min-width: 220px; }
+    #wName { font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 800; color: var(--cyan); letter-spacing: 1px; }
+    #ammo { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 36px; line-height: 1.1; }
+    #ammo small { font-size: 15px; color: var(--muted); font-weight: 700; }
+    #ammo.low { color: var(--pink); animation: lowPulse .8s infinite; }
+    @keyframes lowPulse { 50% { opacity: .55; } }
+    #reloadTxt:not(:empty) { animation: lowPulse .6s infinite; }
+    #reloadTxt { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--yellow); height: 14px; }
+    #slots { display: flex; gap: 5px; justify-content: flex-end; margin-top: 6px; }
+    #slots div { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; padding: 3px 7px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.15); color: var(--muted); pointer-events: auto; cursor: pointer; }
+    #slots div.on { border-color: var(--cyan); color: var(--cyan); background: rgba(0,240,255,0.15); }
+
+    #banner { position: absolute; top: 22%; left: 50%; transform: translate(-50%, 0) scale(0.9); opacity: 0; transition: all .2s cubic-bezier(.2,1.4,.4,1); text-align: center; font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(22px, 4.5vw, 40px); letter-spacing: 4px; white-space: nowrap; background: linear-gradient(120deg, var(--yellow), var(--pink)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 18px rgba(255,0,85,.6)); }
+    #banner.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    #banner small { display: block; font-size: 13px; letter-spacing: 3px; -webkit-text-fill-color: #fff; opacity: .85; margin-top: 4px; }
+    #pickupMsg { position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%); font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 2px; opacity: 0; transition: opacity .2s; text-shadow: 0 0 10px currentColor; }
+
+    #dmgNums { position: absolute; inset: 0; overflow: hidden; }
+    .dn { position: absolute; left: 0; top: 0; font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 17px; color: #fff; text-shadow: 0 0 6px #000, 0 0 10px rgba(0,240,255,.8); will-change: transform, opacity; }
+    .dn.hs { color: var(--yellow); font-size: 22px; text-shadow: 0 0 6px #000, 0 0 12px var(--pink); }
+
+    /* Overlays */
+    .overlay { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: auto; padding: 16px; }
+    #deathScreen { background: radial-gradient(ellipse, rgba(80, 0, 20, 0.25), rgba(30, 0, 10, 0.65)); pointer-events: none; }
+    #deathScreen h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(26px, 5vw, 44px); color: var(--pink); letter-spacing: 5px; text-shadow: 0 0 25px var(--pink); }
+    #deathScreen p { font-family: 'JetBrains Mono', monospace; font-size: 14px; margin-top: 8px; color: #fff; }
+    #pauseScreen { background: rgba(4, 6, 16, 0.72); backdrop-filter: blur(4px); cursor: pointer; }
+    #pauseScreen .menu-card { cursor: default; max-width: 420px; }
+    #pauseScreen h2, #endScreen h2 { font-family: 'Orbitron', sans-serif; font-weight: 900; letter-spacing: 4px; text-align: center; margin-bottom: 14px; color: var(--cyan); }
+    #endScreen { background: rgba(4, 6, 16, 0.85); backdrop-filter: blur(6px); }
+    .board { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+    .board th { text-align: left; color: var(--muted); font-size: 10px; letter-spacing: 1px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+    .board td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-weight: 800; }
+    .board tr.me td { color: var(--cyan); background: rgba(0,240,255,0.08); }
+    .board .bot { font-size: 9px; color: var(--muted); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 0 4px; margin-left: 6px; }
+    .board td.n { text-align: right; } .board th.n { text-align: right; }
+    #scoreboard { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(94vw, 560px); padding: 16px; z-index: 40; }
+    #scoreboard h3 { font-family: 'Orbitron', sans-serif; font-size: 13px; letter-spacing: 3px; color: var(--cyan); margin-bottom: 8px; display: flex; justify-content: space-between; }
+    #endNext { margin-top: 14px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted); }
+    #winner { text-align: center; font-family: 'Orbitron', sans-serif; font-size: 20px; color: var(--yellow); margin-bottom: 12px; letter-spacing: 2px; }
+    #loading { position: absolute; inset: 0; z-index: 200; background: #060814; display: flex; align-items: center; justify-content: center; font-family: 'Orbitron', sans-serif; letter-spacing: 4px; color: var(--cyan); }
+
+    /* ───── TOUCH ───── */
+    #touch { position: absolute; inset: 0; z-index: 30; display: none; pointer-events: none; }
+    .is-touch #touch { display: block; }
+    .is-touch #status { width: 190px; padding: 8px 10px; left: 12px; bottom: auto; top: 160px; }
+    .is-touch #hpNum { font-size: 22px; min-width: 46px; }
+    .is-touch #weapon { right: auto; left: 50%; transform: translateX(-50%); bottom: auto; top: 50px; min-width: 0; padding: 4px 12px; display: flex; gap: 10px; align-items: center; }
+    .is-touch #ammo { font-size: 20px; }
+    .is-touch #slots, .is-touch #wName { display: none; }
+    .is-touch #minimapWrap { width: 110px; height: 110px; }
+    .is-touch #mapName { top: 126px; }
+    .is-touch #status { top: 142px; }
+    .is-touch #chat { bottom: 170px; }
+    .is-touch .controls { display: none; }
+    /* Touch layout: joystick bottom-left, FIRE bottom-right with action buttons in an arc around it,
+       small utility buttons in a row at the top-right. All offsets respect phone safe areas. */
+    #touch { --sl: env(safe-area-inset-left, 0px); --sr: env(safe-area-inset-right, 0px); --sb: env(safe-area-inset-bottom, 0px); }
+    #joy { position: absolute; left: calc(22px + var(--sl)); bottom: calc(22px + var(--sb)); width: 128px; height: 128px; border-radius: 50%; background: radial-gradient(circle, rgba(0,240,255,0.08), rgba(10,14,34,0.35) 70%); border: 2px solid rgba(0,240,255,0.35); pointer-events: auto; touch-action: none; }
+    #joyKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #7ff8ff, #0090b0); box-shadow: 0 0 14px rgba(0,240,255,0.6); }
+    #aimZone { position: absolute; right: 0; top: 0; width: 60%; height: 100%; pointer-events: auto; touch-action: none; }
+    .tb { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      width: 54px; height: 54px; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 9px; letter-spacing: .5px; color: #fff;
+      background: rgba(10, 14, 34, 0.5); border: 2px solid rgba(255,255,255,0.28); backdrop-filter: blur(3px); transition: transform .06s; }
+    .tb.down { filter: brightness(1.6); transform: scale(0.92); }
+    /* FIRE: anchor of the arc */
+    #tFire { right: calc(26px + var(--sr)); bottom: calc(26px + var(--sb)); width: 92px; height: 92px; font-size: 13px; background: rgba(255,0,85,0.42); border: 3px solid rgba(255,0,85,0.95); box-shadow: 0 0 22px rgba(255,0,85,0.35); }
+    /* Arc around FIRE (radius ~110px) */
+    #tJump   { right: calc(140px + var(--sr)); bottom: calc(28px + var(--sb));  width: 62px; height: 62px; border-color: var(--cyan); font-size: 10px; }
+    #tSlide  { right: calc(128px + var(--sr)); bottom: calc(104px + var(--sb)); border-color: rgba(255,255,255,0.45); }
+    #tAds    { right: calc(70px + var(--sr));  bottom: calc(146px + var(--sb)); border-color: var(--yellow); }
+    #tReload { right: calc(16px + var(--sr));  bottom: calc(136px + var(--sb)); width: 46px; height: 46px; font-size: 18px; }
+    #tDash   { right: calc(212px + var(--sr)); bottom: calc(40px + var(--sb));  width: 50px; height: 50px; border-color: var(--green); }
+    /* Second fire button above the joystick for left thumb */
+    #tFire2 { left: calc(164px + var(--sl)); bottom: calc(96px + var(--sb)); width: 58px; height: 58px; background: rgba(255,0,85,0.3); border-color: rgba(255,0,85,0.75); }
+    /* Utility row top-right */
+    #tSwap, #tBoard, #tMenu { top: 64px; width: 46px; height: 38px; border-radius: 12px; font-size: 9px; }
+    #tSwap  { right: calc(12px + var(--sr)); width: 60px; border-color: var(--cyan); font-size: 14px; }
+    #tBoard { right: calc(80px + var(--sr)); font-size: 14px; }
+    #tMenu  { right: calc(134px + var(--sr)); }
+    .is-touch #killfeed { right: auto; left: 50%; transform: translateX(-50%); top: 96px; align-items: center; }
+    .is-touch #killfeed .kf:nth-last-child(n+4) { display: none; }
+    .is-touch .tiny, .is-touch #dashBar { display: none; }
+    .is-touch .bar.thin { display: none; }
+    .is-touch .kf { font-size: 10px; padding: 3px 8px; }
+    @media (max-height: 520px) {
+      #menu { justify-content: flex-start; }
+      .logo { font-size: 40px; }
+      .tagline { margin: 4px 0 10px; }
+      .menu-card { padding: 12px 16px; }
+      .field { margin-bottom: 8px; }
+      .field input[type=text] { padding: 8px 12px; }
+      .btn { padding: 11px; }
+    }
+    @media (max-height: 420px) {
+      .is-touch #minimapWrap { width: 90px; height: 90px; } .is-touch #mapName { display: none; } .is-touch #status { top: 108px; }
+      #joy { width: 110px; height: 110px; bottom: calc(14px + var(--sb)); }
+      #tFire { width: 80px; height: 80px; right: calc(20px + var(--sr)); bottom: calc(18px + var(--sb)); }
+      #tJump { right: calc(122px + var(--sr)); bottom: calc(18px + var(--sb)); width: 56px; height: 56px; }
+      #tSlide { right: calc(112px + var(--sr)); bottom: calc(86px + var(--sb)); width: 48px; height: 48px; }
+      #tAds { right: calc(60px + var(--sr)); bottom: calc(122px + var(--sb)); width: 48px; height: 48px; }
+      #tReload { right: calc(12px + var(--sr)); bottom: calc(112px + var(--sb)); width: 42px; height: 42px; }
+      #tDash { right: calc(186px + var(--sr)); bottom: calc(26px + var(--sb)); width: 46px; height: 46px; }
+      #tFire2 { bottom: calc(80px + var(--sb)); left: calc(138px + var(--sl)); width: 52px; height: 52px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="loading"><div style="text-align:center;padding:20px"><div id="loadingText">LOADING…</div><div id="loadingErr" style="font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0;color:#ff6b9a;margin-top:14px;max-width:520px"></div></div></div>
+  <script>
+    // Show load problems instead of an endless loading screen.
+    window.__veckFail = function (msg) {
+      if (window.__veckLoaded) return;
+      var t = document.getElementById('loadingText'), e = document.getElementById('loadingErr');
+      if (t) t.textContent = 'COULD NOT START';
+      if (e) e.innerHTML = String(msg).replace(/</g, '&lt;') + '<br><br><button onclick="location.reload()" style="padding:10px 18px;border-radius:8px;border:1px solid #00f0ff;background:#0a1028;color:#00f0ff;font-family:inherit;cursor:pointer">RELOAD</button>';
+    };
+    window.addEventListener('error', function (ev) { window.__veckFail(ev.message || 'Script failed to load'); });
+    window.addEventListener('unhandledrejection', function (ev) { window.__veckFail(ev.reason && ev.reason.message || 'Startup error'); });
+    setTimeout(function () { window.__veckFail('The game is taking too long to load. Check your connection and reload.'); }, 20000);
+  </script>
+
+  <!-- ───── MENU ───── -->
+  <div id="menu">
+    <div class="logo">VECK.IO</div>
+    <div class="tagline">MULTIPLAYER ARENA SHOOTER</div>
+    <div class="menu-card">
+      <div class="field">
+        <label for="nameInput">CALL-SIGN</label>
+        <input type="text" id="nameInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label for="roomInput">ROOM — leave PUBLIC for quick play, or type a code to play with friends</label>
+        <input type="text" id="roomInput" maxlength="16" autocomplete="off" spellcheck="false" value="PUBLIC">
+      </div>
+      <div class="field">
+        <label>SKIN</label>
+        <div class="skins" id="skins"></div>
+      </div>
+      <button class="btn" id="playBtn">PLAY ONLINE</button>
+      <div class="row" style="margin-top:10px">
+        <button class="btn secondary" id="offlineBtn">PRACTICE VS BOTS (OFFLINE)</button>
+      </div>
+      <div class="field" style="margin:10px 0 0">
+        <label for="practiceMap">MAP — online &amp; offline (Random = rotating maps)</label>
+        <select id="practiceMap" style="width:100%;padding:9px;border-radius:10px;background:rgba(4,8,22,0.9);color:var(--cyan);border:1px solid rgba(0,240,255,0.25);font-family:'JetBrains Mono',monospace;font-weight:800"></select>
+      </div>
+      <div id="serverStatus"><span class="dot"></span><span id="serverText">Checking game server…</span></div>
+      <div id="menuError"></div>
+      <details class="settings">
+        <summary>⚙ SETTINGS</summary>
+        <div class="set-grid" id="settingsGrid"></div>
+      </details>
+    </div>
+    <div class="controls">
+      <span><kbd>WASD</kbd> move</span><span><kbd>SPACE</kbd> jump</span><span><kbd>C</kbd>/<kbd>CTRL</kbd> slide</span>
+      <span><kbd>SHIFT</kbd>/<kbd>Q</kbd> dash</span><span><kbd>LMB</kbd> or <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd>… shoot</span><span><kbd>RMB</kbd> aim</span><span><kbd>1-4</kbd> weapons</span><span><kbd>R</kbd> reload</span>
+      <span><kbd>TAB</kbd> scores</span><span><kbd>ENTER</kbd> chat</span>
+    </div>
+  </div>
+
+  <!-- ───── HUD ───── -->
+  <div id="hud" class="hidden">
+    <div id="scope"></div>
+    <div id="vignette"></div>
+    <div id="dmgDir"></div>
+    <div id="crosshair"><i class="c-dot"></i><i class="c-t"></i><i class="c-b"></i><i class="c-l"></i><i class="c-r"></i><i class="c-ring"></i></div>
+    <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    <div id="dmgNums"></div>
+
+    <div id="minimapWrap" class="panel"><canvas id="minimap" width="140" height="140"></canvas></div>
+    <div id="mapName"></div>
+    <div id="topbar">
+      <div class="panel" id="myScore">#1 · 0</div>
+      <div class="panel" id="timer">6:00</div>
+      <div class="panel" id="lead">LEAD 0/30</div>
+    </div>
+    <div id="netinfo"><span id="pingTxt">PING <b>--</b></span> · <span id="fpsTxt">-- FPS</span><br><span id="roomTxt"></span></div>
+    <div id="killfeed"></div>
+    <div id="chat"></div>
+    <input id="chatInput" class="hidden" maxlength="90" placeholder="Say something… (Enter to send, Esc to cancel)">
+
+    <div id="status" class="panel">
+      <div class="hp-row"><span id="hpNum">100</span><span class="hp-label">HEALTH</span></div>
+      <div class="bar"><i id="hpBar"></i></div>
+      <div class="tiny"><span>DASH</span><span id="dashTxt">READY</span></div>
+      <div class="bar thin"><i id="dashBar"></i></div>
+    </div>
+    <div id="weapon" class="panel">
+      <div id="wName">VK-12 PULSE RIFLE</div>
+      <div id="ammo">30 <small>/ 180</small></div>
+      <div id="reloadTxt"></div>
+      <div id="slots"></div>
+    </div>
+    <div id="banner"></div>
+    <div id="pickupMsg"></div>
+
+    <div id="scoreboard" class="panel hidden">
+      <h3><span id="sbTitle">SCOREBOARD</span><span id="sbRoom"></span></h3>
+      <table class="board"><thead><tr><th>#</th><th>PLAYER</th><th class="n">K</th><th class="n">D</th><th class="n">PING</th></tr></thead><tbody id="sbBody"></tbody></table>
+    </div>
+
+    <div id="touch">
+      <div id="aimZone"></div>
+      <div id="joy"><div id="joyKnob"></div></div>
+      <div class="tb" id="tFire">FIRE</div>
+      <div class="tb" id="tFire2">FIRE</div>
+      <div class="tb" id="tJump">JUMP</div>
+      <div class="tb" id="tAds">AIM</div>
+      <div class="tb" id="tSlide">SLIDE</div>
+      <div class="tb" id="tReload">⟳</div>
+      <div class="tb" id="tDash">DASH</div>
+      <div class="tb" id="tSwap">⇄ GUN</div>
+      <div class="tb" id="tMenu">MENU</div>
+      <div class="tb" id="tBoard">☰</div>
+    </div>
+  </div>
+
+  <div id="deathScreen" class="overlay hidden"><h2>ELIMINATED</h2><p id="deathBy"></p><p id="deathTimer"></p></div>
+  <div id="pauseScreen" class="overlay hidden">
+    <div class="menu-card" id="pauseCard">
+      <h2>PAUSED</h2>
+      <button class="btn" id="resumeBtn">CLICK TO PLAY</button>
+      <p style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);text-align:center;margin:8px 0 4px">Click captures your mouse for aiming · ESC frees it</p>
+      <div class="set-grid" id="pauseSettings"></div>
+      <div class="row" style="margin-top:14px"><button class="btn secondary" id="leaveBtn">LEAVE MATCH</button></div>
+    </div>
+  </div>
+  <div id="endScreen" class="overlay hidden">
+    <div class="menu-card">
+      <h2>MATCH OVER</h2>
+      <div id="winner"></div>
+      <table class="board"><thead><tr><th>#</th><th>PLAYER</th><th class="n">K</th><th class="n">D</th></tr></thead><tbody id="endBody"></tbody></table>
+      <div id="endNext"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="shared.js"></script>
+  <script src="room.js"></script>
+  <script type="module" src="game.js" onerror="window.__veckFail('game.js failed to download')"></script>
+</body>
+</html>

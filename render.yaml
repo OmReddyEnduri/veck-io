@@ -1,0 +1,13 @@
+# Render Blueprint: the WebSocket game server.
+services:
+  - type: web
+    name: veck-io-server
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm install --omit=dev
+    startCommand: node server/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
