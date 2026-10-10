@@ -83,7 +83,7 @@
       if (bot) {
         p.vel = { x: 0, y: 0, z: 0 };
         p.phys = { onGround: true, wasGround: true };
-        p.ai = { target: null, seenAt: 0, nextThink: 0, nextFire: 0, strafe: 1, strafeUntil: 0, goal: null, goalUntil: 0, lastX: 0, lastZ: 0, stuckAt: 0, reactAt: 0, skill: 0.75 + Math.random() * 0.5 };
+        p.ai = { target: null, seenAt: 0, nextThink: 0, nextFire: 0, strafe: 1, strafeUntil: 0, goal: null, goalUntil: 0, lastX: 0, lastZ: 0, stuckAt: 0, reactAt: 0, skill: 0.6 + Math.random() * 0.3, burstUntil: 0, restUntil: 0 };
       }
       this.players.set(p.id, p);
       return p;
@@ -336,7 +336,7 @@
       const ox = a.x, oy = a.y + PLAYER.eye, oz = a.z;
       let dx = b.x - ox, dy = b.y + 1.2 - oy, dz = b.z - oz;
       const d = Math.hypot(dx, dy, dz);
-      if (d > 85) return false;
+      if (d > 45) return false;
       dx /= d; dy /= d; dz /= d;
       return rayMap(this.map, ox, oy, oz, dx, dy, dz, d) >= d - 0.3;
     }
@@ -353,7 +353,7 @@
           if (d < bestD && this.visible(b, q)) { bestD = d; best = q; }
         }
         if (best) {
-          if (ai.target !== best.id || t - ai.seenAt > 1500) ai.reactAt = t + (350 + Math.random() * 350) / ai.skill;
+          if (ai.target !== best.id || t - ai.seenAt > 1500) ai.reactAt = t + (900 + Math.random() * 900) / ai.skill;
           ai.target = best.id; ai.seenAt = t; ai.hasLos = true;
         } else ai.hasLos = false;
         // Stuck detection
@@ -437,21 +437,25 @@
       }
 
       // Shooting
-      if (engaged && t >= ai.reactAt && t >= ai.nextFire) {
-        ai.nextFire = t + 130 + Math.random() * 90;
+      // Easy bots: short bursts with long pauses, slow fire.
+      if (engaged && t >= ai.reactAt && t >= ai.restUntil && !ai.burstUntil) ai.burstUntil = t + 700 + Math.random() * 600;
+      if (ai.burstUntil && t > ai.burstUntil) { ai.burstUntil = 0; ai.restUntil = t + 1400 + Math.random() * 1600; }
+      if (engaged && ai.burstUntil && t >= ai.nextFire) {
+        ai.nextFire = t + 260 + Math.random() * 220;
         b.protUntil = 0;
         const dx = target.x - b.x, dy = target.y - b.y, dz = target.z - b.z;
         const d = Math.hypot(dx, dy, dz);
         const tSpeed = target.hist.length > 1 ? Math.hypot(target.x - target.hist[0].x, target.z - target.hist[0].z) / Math.max(0.1, (t - target.hist[0].t) / 1000) : 0;
-        const chance = Math.max(0.08, Math.min(0.55, (0.5 - d * 0.006 - tSpeed * 0.012) * ai.skill));
+        const chance = Math.max(0.03, Math.min(0.2, (0.24 - d * 0.005 - tSpeed * 0.02) * ai.skill));
         const hit = Math.random() < chance;
         const ox = b.x, oy = b.y + 1.45, oz = b.z;
         let ex = target.x, ey = target.y + 1.1, ez = target.z;
-        if (!hit) { ex += (Math.random() - 0.5) * 3; ey += (Math.random() - 0.2) * 1.6; ez += (Math.random() - 0.5) * 3; }
+        if (!hit) { ex += (Math.random() - 0.5) * 5; ey += (Math.random() - 0.2) * 2.5; ez += (Math.random() - 0.5) * 5; }
         this.broadcast({ t: 'f', id: b.id, w: 0, o: [r2(ox), r2(oy), r2(oz)], e: [r2(ex), r2(ey), r2(ez)] });
         if (hit) {
-          const hs = Math.random() < 0.12;
-          this.applyDamage(target, b, hs ? 13 : 8, 0, hs);
+          const hs = Math.random() < 0.05;
+          // Weak against humans (easy practice), stronger against other bots so the killfeed stays lively.
+          this.applyDamage(target, b, target.bot ? (hs ? 30 : 20) : (hs ? 9 : 6), 0, hs);
         }
       }
     }
