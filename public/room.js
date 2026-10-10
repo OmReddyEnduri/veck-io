@@ -426,7 +426,8 @@
       if (ai.jumpNow && b.phys.onGround) { b.vel.y = map.jump; ai.jumpNow = false; }
       b.vel.y -= map.gravity * dt;
       checkPads(b, b.vel, map);
-      moveBody(b, b.vel, dt, map, b.phys);
+      // Small physics substeps so fast-moving bots can't tunnel through thin objects.
+      for (let k = 0; k < 4; k++) moveBody(b, b.vel, dt / 4, map, b.phys);
       b.flags = (Math.hypot(b.vel.x, b.vel.z) > 1 ? 1 : 0) | (b.phys.onGround ? 0 : 4);
       b.w = 0;
       this.pushHistory(b);

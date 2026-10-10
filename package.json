@@ -6,7 +6,7 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "test": "node tests/sim.test.js"
+    "test": "node tests/collision.test.js"
   },
   "engines": { "node": ">=18" },
   "dependencies": {

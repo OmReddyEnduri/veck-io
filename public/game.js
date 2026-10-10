@@ -316,11 +316,11 @@ function buildDeco(m4) {
   if (map.deco === 'skyline' || map.deco === 'rain') {
     const n = map.deco === 'skyline' ? 80 : 50;
     const sky = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(map.sky).multiplyScalar(1.8) }), n);
-    ring(n, (i, a) => { const d = H + 25 + (i * 37 % 50), w = 8 + (i * 13 % 14), h = 25 + (i * 29 % 80); m4.makeScale(w, h, w); m4.setPosition(Math.cos(a) * d, h / 2, Math.sin(a) * d); sky.setMatrixAt(i, m4); });
+    ring(n, (i, a) => { const w = 8 + (i * 13 % 14), d = H + w + 6 + (i * 37 % 50), h = 25 + (i * 29 % 80); m4.makeScale(w, h, w); m4.setPosition(Math.cos(a) * d, h / 2, Math.sin(a) * d); sky.setMatrixAt(i, m4); });
     world.add(sky);
     // Neon window strips on the skyline
     const lights = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: map.edge }), n);
-    ring(n, (i, a) => { const d = H + 24 + (i * 37 % 50), h = 25 + (i * 29 % 80); m4.makeScale(6, 0.4, 6); m4.setPosition(Math.cos(a) * (d - 0.5), h * (0.4 + (i % 5) * 0.1), Math.sin(a) * (d - 0.5)); lights.setMatrixAt(i, m4); });
+    ring(n, (i, a) => { const w = 8 + (i * 13 % 14), d = H + w + 5 + (i * 37 % 50), h = 25 + (i * 29 % 80); m4.makeScale(6, 0.4, 6); m4.setPosition(Math.cos(a) * (d - 0.5), h * (0.4 + (i % 5) * 0.1), Math.sin(a) * (d - 0.5)); lights.setMatrixAt(i, m4); });
     world.add(lights);
   }
   if (map.deco === 'rain') {
@@ -339,19 +339,19 @@ function buildDeco(m4) {
     decoAnim.push((dt, t) => { for (let i = 0; i < pos.length; i += 3) { pos[i + 1] -= dt * 2.5; pos[i] += Math.sin(t + i) * dt * 0.6; if (pos[i + 1] < 0) pos[i + 1] += 30; } g.attributes.position.needsUpdate = true; });
     // Snowy mountains around the yard
     const mnt = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 5), new THREE.MeshLambertMaterial({ color: 0xe8f0f8 }), 24);
-    ring(24, (i, a) => { const d = H + 50 + (i * 23 % 40), s = 35 + (i * 17 % 30); m4.makeScale(s, s * 0.9, s); m4.setPosition(Math.cos(a) * d, s * 0.45, Math.sin(a) * d); mnt.setMatrixAt(i, m4); });
+    ring(24, (i, a) => { const s = 35 + (i * 17 % 30), d = H + s + 6 + (i * 23 % 40); m4.makeScale(s, s * 0.9, s); m4.setPosition(Math.cos(a) * d, s * 0.45, Math.sin(a) * d); mnt.setMatrixAt(i, m4); });
     world.add(mnt);
   }
   if (map.deco === 'clouds') {
     const cl = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x9ab, emissiveIntensity: 0.5 }), 36);
-    ring(36, (i, a) => { const d = H + 30 + (i * 31 % 60), s = 10 + (i * 7 % 12); m4.makeScale(s * 1.8, s * 0.7, s); m4.setPosition(Math.cos(a) * d, 12 + (i * 11 % 30), Math.sin(a) * d); cl.setMatrixAt(i, m4); });
+    ring(36, (i, a) => { const s = 10 + (i * 7 % 12), d = H + s * 1.8 + 6 + (i * 31 % 60); m4.makeScale(s * 1.8, s * 0.7, s); m4.setPosition(Math.cos(a) * d, 12 + (i * 11 % 30), Math.sin(a) * d); cl.setMatrixAt(i, m4); });
     world.add(cl);
     const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(12, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false }));
     sunMesh.position.set(-150, 120, -200); world.add(sunMesh);
   }
   if (map.deco === 'dunes') {
     const du = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: map.ground }), 30);
-    ring(30, (i, a) => { const d = H + 30 + (i * 29 % 50), s = 30 + (i * 13 % 30); m4.makeScale(s * 1.6, s * 0.35, s); m4.setPosition(Math.cos(a) * d, 0, Math.sin(a) * d); du.setMatrixAt(i, m4); });
+    ring(30, (i, a) => { const s = 30 + (i * 13 % 30), d = H + s * 1.6 + 6 + (i * 29 % 30); m4.makeScale(s * 1.6, s * 0.35, s); m4.setPosition(Math.cos(a) * d, 0, Math.sin(a) * d); du.setMatrixAt(i, m4); });
     world.add(du);
     const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(16, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff0c0, fog: false }));
     sunMesh.position.set(160, 70, -180); world.add(sunMesh);
@@ -360,10 +360,10 @@ function buildDeco(m4) {
     // Glowing lava pools and rivers around the arena edge + rising embers.
     const lavaMat = new THREE.MeshBasicMaterial({ color: 0xff5a10 });
     const lava = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 18), lavaMat, 20);
-    ring(20, (i, a) => { const d = H + 12 + (i * 17 % 30), s = 10 + (i * 7 % 14); m4.makeRotationX(-Math.PI / 2); m4.scale(new THREE.Vector3(s, s, 1)); m4.setPosition(Math.cos(a) * d, 0.05, Math.sin(a) * d); lava.setMatrixAt(i, m4); });
+    ring(20, (i, a) => { const s = 10 + (i * 7 % 14), d = H + s + 4 + (i * 17 % 30); m4.makeRotationX(-Math.PI / 2); m4.scale(new THREE.Vector3(s, s, 1)); m4.setPosition(Math.cos(a) * d, 0.05, Math.sin(a) * d); lava.setMatrixAt(i, m4); });
     world.add(lava);
     const volc = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 7), new THREE.MeshLambertMaterial({ color: 0x2a0e08 }), 10);
-    ring(10, (i, a) => { const d = H + 60 + (i * 19 % 40), s = 40 + (i * 13 % 30); m4.makeScale(s, s, s); m4.setPosition(Math.cos(a + 0.3) * d, s / 2, Math.sin(a + 0.3) * d); volc.setMatrixAt(i, m4); });
+    ring(10, (i, a) => { const s = 40 + (i * 13 % 30), d = H + s + 8 + (i * 19 % 40); m4.makeScale(s, s, s); m4.setPosition(Math.cos(a + 0.3) * d, s / 2, Math.sin(a + 0.3) * d); volc.setMatrixAt(i, m4); });
     world.add(volc);
     const n = 300, pos = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() * 2 - 1) * H; pos[i * 3 + 1] = Math.random() * 25; pos[i * 3 + 2] = (Math.random() * 2 - 1) * H; }

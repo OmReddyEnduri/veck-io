@@ -374,7 +374,9 @@
     quad.push(B(56, 6, 2.5, 2.5, 1.2, 0, 1), B(60, 26, 2.5, 2.5, 2.4, 0, 2), B(40, 56, 12, 1, 3.5, 0, 0), B(14, 40, 2, 2, 4, 0, 1));
     boxes.push(...rot4(quad));
     // The giant doll stands on the far side (collision column; the figure is drawn by the client).
-    boxes.push(B(0, -H + 7, 4, 4, 2, 0, 3));
+    boxes.push(B(0, -H + 7, 5.4, 5.4, 11.5, 0, 3));
+    // Guards (drawn by the client) are solid too.
+    for (const [x, z] of [[-8, -H + 6], [8, -H + 6], [-H + 4, 0], [H - 4, 0]]) boxes.push(B(x, z, 0.9, 0.9, 2.3, 0, 3));
     boxes.push(...boundary(H, 22));
     return {
       boxes,
